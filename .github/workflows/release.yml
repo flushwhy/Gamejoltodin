@@ -1,0 +1,75 @@
+name: Release
+
+# -------------------------------------------------
+# When to run the workflow
+# -------------------------------------------------
+on:
+  push:
+    tags:
+      - 'v*'               # e.g. v1.2.3
+
+# -------------------------------------------------
+# Jobs
+# -------------------------------------------------
+jobs:
+  build-and-package:
+    runs-on: windows-latest
+    steps:
+      # -------------------------------------------------
+      # 1️⃣ Checkout the repository
+      # -------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # -------------------------------------------------
+      # 2️⃣ Install Odin (Windows)
+      # -------------------------------------------------
+      - name: Install Odin
+        shell: pwsh
+        run: |
+          $odinUrl = "https://github.com/odin-lang/Odin/releases/download/v2026.08.20/odin-windows-amd64.zip"
+          Invoke-WebRequest -Uri $odinUrl -OutFile odin.zip
+          Expand-Archive odin.zip -DestinationPath odin
+          $odinBin = Join-Path (Get-Location) "odin\odin.exe"
+          echo "$odinBin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      # -------------------------------------------------
+      # 3️⃣ Build the DLL (shared library)
+      # -------------------------------------------------
+      - name: Build GameJolt DLL
+        shell: pwsh
+        run: |
+          # Ensure the build script is executable
+          .\build.bat
+
+      # -------------------------------------------------
+      # 4️⃣ Create the zip archive
+      # -------------------------------------------------
+      - name: Create release zip
+        id: zip
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}"   # e.g. v1.2.3
+          # Strip any leading 'v' for the file name (optional)
+          $cleanVersion = $version -replace '^v',''
+          $zipName = "odinJolt_${cleanVersion}.zip"
+          $files = @(
+            "bin\gamejolt.dll",
+            "gamejolt.h",
+            "README.md",
+            ".gitignore"
+          )
+          Compress-Archive -Path $files -DestinationPath $zipName -Force
+          echo "zip_name=$zipName" >> $env:GITHUB_OUTPUT
+
+      # -------------------------------------------------
+      # 5️⃣ Publish the zip as a GitHub Release
+      # -------------------------------------------------
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "OdinJolt ${{ github.ref_name }}"
+          files: ${{ steps.zip.outputs.zip_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
