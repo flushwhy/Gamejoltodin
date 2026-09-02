@@ -6,8 +6,8 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'               # e.g. v1.2.3
-  workflow_dispatch:        # lets you trigger it manually too
+      - 'v*'            # e.g. v1.2.3
+  workflow_dispatch:
 
 # -------------------------------------------------
 # Jobs
@@ -45,7 +45,8 @@ jobs:
         if: matrix.platform == 'windows'
         shell: pwsh
         run: |
-          $release = Invoke-RestMethod -Uri "https://api.github.com/repos/odin-lang/Odin/releases/latest"
+          $headers = @{ "Authorization" = "token $($env:GITHUB_TOKEN)" }
+          $release = Invoke-RestMethod -Uri "https://api.github.com/repos/odin-lang/Odin/releases/latest" -Headers $headers
           $asset = $release.assets | Where-Object { $_.name -like "*${{ matrix.odin_platform }}*" } | Select-Object -First 1
           if (-not $asset) { throw "No Odin asset found for ${{ matrix.odin_platform }}" }
           Write-Host "Using Odin release: $($release.tag_name) -> $($asset.name)"
@@ -53,6 +54,8 @@ jobs:
           Expand-Archive odin_archive -DestinationPath odin -Force
           $odinBin = Join-Path (Get-Location) "odin\odin.exe"
           echo "$odinBin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # -------------------------------------------------
       # 2️⃣ Install the latest Odin release (macOS / Linux)
@@ -61,12 +64,14 @@ jobs:
         if: matrix.platform != 'windows'
         shell: bash
         run: |
-          assetUrl=$(curl -s https://api.github.com/repos/odin-lang/Odin/releases/latest \
-            | jq -r --arg p "${{ matrix.odin_platform }}" '.assets[] | select(.name | contains($p)) | .browser_download_url' \
-            | head -n1)
-          if [ -z "$assetUrl" ]; then
-            echo "No Odin asset found for ${{ matrix.odin_platform }}"; exit 1
+          response=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/odin-lang/Odin/releases/latest)
+          assetUrl=$(echo "$response" | jq -r --arg p "${{ matrix.odin_platform }}" '.assets[]? | select(.name | contains($p)) | .browser_download_url' | head -n1)
+          
+          if [ -z "$assetUrl" ] || [ "$assetUrl" = "null" ]; then
+            echo "Error: No Odin asset found for ${{ matrix.odin_platform }}"
+            exit 1
           fi
+          
           echo "Downloading: $assetUrl"
           curl -L -o odin_archive "$assetUrl"
           mkdir -p odin
@@ -103,8 +108,16 @@ jobs:
         run: |
           $version = "${{ github.ref_name }}" -replace '^v',''
           $zipName = "odinJolt_${version}_windows.zip"
+          
+          # Adjust paths below if build.bat outputs to a different folder (e.g. root or bin\)
           $files = @("bin\gamejolt.dll", "gamejolt.h", "README.md", ".gitignore")
-          Compress-Archive -Path $files -DestinationPath $zipName -Force
+          $validFiles = $files | Where-Object { Test-Path $_ }
+          
+          if ($validFiles.Count -eq 0) {
+            throw "Error: None of the target files to archive were found!"
+          }
+          
+          Compress-Archive -Path $validFiles -DestinationPath $zipName -Force
           echo "zip_name=$zipName" >> $env:GITHUB_OUTPUT
 
       - name: Create release zip (macOS/Linux)
