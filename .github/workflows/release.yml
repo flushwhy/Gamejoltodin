@@ -84,7 +84,17 @@ jobs:
           echo "$(pwd)/odin" >> "$GITHUB_PATH"
 
       # -------------------------------------------------
-      # 2️⃣ Build the shared library
+      # 2️⃣ Install Linux System Dependencies (curl & mbedtls)
+      # -------------------------------------------------
+      - name: Install Linux Dependencies
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libcurl4-openssl-dev libmbedtls-dev
+
+      # -------------------------------------------------
+      # 3️⃣ Build the shared library
       # -------------------------------------------------
       - name: Build GameJolt library (Windows)
         if: matrix.platform == 'windows'
@@ -99,7 +109,7 @@ jobs:
           ./build.sh
 
       # -------------------------------------------------
-      # 3️⃣ Create the zip archive
+      # 4️⃣ Create the zip archive
       # -------------------------------------------------
       - name: Create release zip (Windows)
         if: matrix.platform == 'windows'
@@ -124,7 +134,7 @@ jobs:
           echo "zip_name=$zipName" >> "$GITHUB_OUTPUT"
 
       # -------------------------------------------------
-      # 4️⃣ Publish the zip as a GitHub Release
+      # 5️⃣ Publish the zip as a GitHub Release
       # -------------------------------------------------
       - name: Publish Release
         uses: softprops/action-gh-release@v2
