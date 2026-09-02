@@ -1,17 +1,14 @@
 name: Release
 
-# -------------------------------------------------
-# When to run the workflow
-# -------------------------------------------------
 on:
   push:
     tags:
-      - 'v*'            # e.g. v1.2.3
+      - 'v*'
   workflow_dispatch:
 
-# -------------------------------------------------
-# Jobs
-# -------------------------------------------------
+permissions:
+  contents: write
+
 jobs:
   build-and-package:
     strategy:
@@ -28,18 +25,15 @@ jobs:
             lib_ext: dylib
           - os: ubuntu-latest
             platform: linux
-            odin_platform: ubuntu-amd64
+            odin_platform: linux-amd64
             lib_ext: so
     runs-on: ${{ matrix.os }}
     steps:
-      # -------------------------------------------------
-      # 1️⃣ Checkout the repository
-      # -------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
       # -------------------------------------------------
-      # 2️⃣ Install the latest Odin release (Windows)
+      # 1️⃣ Install Odin (Windows - Direct Download)
       # -------------------------------------------------
       - name: Install Odin (Windows)
         if: matrix.platform == 'windows'
@@ -49,42 +43,48 @@ jobs:
           $release = Invoke-RestMethod -Uri "https://api.github.com/repos/odin-lang/Odin/releases/latest" -Headers $headers
           $asset = $release.assets | Where-Object { $_.name -like "*${{ matrix.odin_platform }}*" } | Select-Object -First 1
           if (-not $asset) { throw "No Odin asset found for ${{ matrix.odin_platform }}" }
-          Write-Host "Using Odin release: $($release.tag_name) -> $($asset.name)"
           Invoke-WebRequest -Uri $asset.browser_download_url -OutFile odin_archive
-          Expand-Archive odin_archive -DestinationPath odin -Force
+          Expand-Archive odin_archive -DestinationPath odin_temp -Force
+          $extractedFolder = Get-ChildItem odin_temp | Select-Object -First 1
+          Move-Item "$($extractedFolder.FullName)" "odin"
+          Remove-Item odin_temp -Recurse -Force
           $odinBin = Join-Path (Get-Location) "odin\odin.exe"
           echo "$odinBin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # -------------------------------------------------
-      # 2️⃣ Install the latest Odin release (macOS / Linux)
+      # 1️⃣ Install Odin (macOS via Homebrew) 🍺
       # -------------------------------------------------
-      - name: Install Odin (macOS/Linux)
-        if: matrix.platform != 'windows'
+      - name: Install Odin (macOS)
+        if: matrix.platform == 'macos'
+        shell: bash
+        run: |
+          brew install odin
+
+      # -------------------------------------------------
+      # 1️⃣ Install Odin (Linux - Direct Download)
+      # -------------------------------------------------
+      - name: Install Odin (Linux)
+        if: matrix.platform == 'linux'
         shell: bash
         run: |
           response=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/odin-lang/Odin/releases/latest)
-          assetUrl=$(echo "$response" | jq -r --arg p "${{ matrix.odin_platform }}" '.assets[]? | select(.name | contains($p)) | .browser_download_url' | head -n1)
+          assetUrl=$(echo "$response" | jq -r --arg p "linux-amd64" '.assets[]? | select(.name | contains($p)) | .browser_download_url' | head -n1)
           
           if [ -z "$assetUrl" ] || [ "$assetUrl" = "null" ]; then
-            echo "Error: No Odin asset found for ${{ matrix.odin_platform }}"
+            echo "Error: No Odin asset found for linux-amd64"
             exit 1
           fi
           
-          echo "Downloading: $assetUrl"
           curl -L -o odin_archive "$assetUrl"
           mkdir -p odin
-          if [[ "$assetUrl" == *.zip ]]; then
-            unzip -q odin_archive -d odin
-          else
-            tar -xzf odin_archive -C odin
-          fi
+          tar -xzf odin_archive -C odin --strip-components=1
           chmod +x odin/odin
           echo "$(pwd)/odin" >> "$GITHUB_PATH"
 
       # -------------------------------------------------
-      # 3️⃣ Build the shared library
+      # 2️⃣ Build the shared library
       # -------------------------------------------------
       - name: Build GameJolt library (Windows)
         if: matrix.platform == 'windows'
@@ -99,7 +99,7 @@ jobs:
           ./build.sh
 
       # -------------------------------------------------
-      # 4️⃣ Create the zip archive
+      # 3️⃣ Create the zip archive
       # -------------------------------------------------
       - name: Create release zip (Windows)
         if: matrix.platform == 'windows'
@@ -108,15 +108,8 @@ jobs:
         run: |
           $version = "${{ github.ref_name }}" -replace '^v',''
           $zipName = "odinJolt_${version}_windows.zip"
-          
-          # Adjust paths below if build.bat outputs to a different folder (e.g. root or bin\)
           $files = @("bin\gamejolt.dll", "gamejolt.h", "README.md", ".gitignore")
           $validFiles = $files | Where-Object { Test-Path $_ }
-          
-          if ($validFiles.Count -eq 0) {
-            throw "Error: None of the target files to archive were found!"
-          }
-          
           Compress-Archive -Path $validFiles -DestinationPath $zipName -Force
           echo "zip_name=$zipName" >> $env:GITHUB_OUTPUT
 
@@ -131,7 +124,7 @@ jobs:
           echo "zip_name=$zipName" >> "$GITHUB_OUTPUT"
 
       # -------------------------------------------------
-      # 5️⃣ Publish the zip as a GitHub Release
+      # 4️⃣ Publish the zip as a GitHub Release
       # -------------------------------------------------
       - name: Publish Release
         uses: softprops/action-gh-release@v2
