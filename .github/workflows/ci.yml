@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master, develop, "Feat-*" ]
+  pull_request:
+    branches: [ main, master, develop ]
+
+jobs:
+  test:
+    name: Test (${{ matrix.platform }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows
+            odin_platform: windows-amd64
+          - os: ubuntu-latest
+            platform: linux
+            odin_platform: linux-amd64
+          - os: macos-latest
+            platform: macos
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Odin (Windows)
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          $headers = @{ "Authorization" = "token $($env:GITHUB_TOKEN)" }
+          $release = Invoke-RestMethod -Uri "https://api.github.com/repos/odin-lang/Odin/releases/latest" -Headers $headers
+          $asset = $release.assets | Where-Object { $_.name -like "*${{ matrix.odin_platform }}*" } | Select-Object -First 1
+          if (-not $asset) { throw "No Odin asset found for ${{ matrix.odin_platform }}" }
+          Invoke-WebRequest -Uri $asset.browser_download_url -OutFile odin_archive
+          Expand-Archive odin_archive -DestinationPath odin_temp -Force
+          $extractedFolder = Get-ChildItem odin_temp | Select-Object -First 1
+          Move-Item "$($extractedFolder.FullName)" "odin"
+          Remove-Item odin_temp -Recurse -Force
+          $odinBin = Join-Path (Get-Location) "odin"
+          echo "$odinBin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Odin (macOS)
+        if: matrix.platform == 'macos'
+        run: |
+            response=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/odin-lang/Odin/releases/latest)
+            assetUrl=$(echo "$response" | jq -r '.assets[]? | select(.name | contains("macos")) | .browser_download_url' | head -n1)
+            if [ -z "$assetUrl" ] || [ "$assetUrl" = "null" ]; then
+              echo "Error: No Odin asset found for macOS"
+              exit 1
+            fi
+            curl -L -o odin_archive "$assetUrl"
+            mkdir -p odin
+            tar -xzf odin_archive -C odin --strip-components=1
+            chmod +x odin/odin
+            echo "$(pwd)/odin" >> "$GITHUB_PATH"
+        env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Odin & Dependencies (Linux)
+        if: matrix.platform == 'linux'
+        run: |
+            sudo apt-get update
+            sudo apt-get install -y libcurl4-openssl-dev build-essential libmbedtls-dev
+            response=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/odin-lang/Odin/releases/latest)
+            assetUrl=$(echo "$response" | jq -r --arg p "linux-amd64" '.assets[]? | select(.name | contains($p)) | .browser_download_url' | head -n1)
+            if [ -z "$assetUrl" ] || [ "$assetUrl" = "null" ]; then
+              echo "Error: No Odin asset found for linux-amd64"
+              exit 1
+            fi
+            curl -L -o odin_archive "$assetUrl"
+            mkdir -p odin
+            tar -xzf odin_archive -C odin --strip-components=1
+            chmod +x odin/odin
+            echo "$(pwd)/odin" >> "$GITHUB_PATH"
+        env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run Tests (Windows)
+        if: matrix.platform == 'windows'
+        shell: cmd
+        run: run_tests.bat
+
+      - name: Run Tests (Linux/macOS)
+        if: matrix.platform != 'windows'
+        shell: bash
+        run: |
+          chmod +x ./build.sh ./run_tests.sh
+          ./run_tests.sh

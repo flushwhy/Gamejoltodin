@@ -12,10 +12,16 @@ mkdir -p "$OUT_DIR"
 case "$(uname -s)" in
     Darwin)
         echo "Building for macOS..."
+        CURL_FLAGS="-lcurl"
+        if [ -d "/opt/homebrew/opt/curl/lib" ]; then
+            CURL_FLAGS="-L/opt/homebrew/opt/curl/lib -lcurl"
+        elif [ -d "/usr/local/opt/curl/lib" ]; then
+            CURL_FLAGS="-L/usr/local/opt/curl/lib -lcurl"
+        fi
         odin build "$PACKAGE" \
             -build-mode:shared \
             -out:"$OUT_DIR/libgamejolt.dylib" \
-            -extra-linker-flags:"-lcurl" \
+            -extra-linker-flags:"$CURL_FLAGS" \
             -o:speed
         echo "Output: $OUT_DIR/libgamejolt.dylib"
         ;;
@@ -29,8 +35,7 @@ case "$(uname -s)" in
         echo "Output: $OUT_DIR/libgamejolt.so"
         ;;
     *)
-        echo "Use build.bat on Windows"
+        echo "Unknown or unsupported platform for build.sh. On Windows, use build.bat."
         exit 1
         ;;
 esac
- 
