@@ -172,8 +172,7 @@ jobs:
           echo "zip_name=$zipName" >> "$GITHUB_OUTPUT"
 
       # -------------------------------------------------
-      # 5️⃣ Attach the zip to the release release-please created
-      #    (no `name`/`body` so release-please's changelog notes are kept)
+      # 5️⃣ Publish the zip as a GitHub Release
       # -------------------------------------------------
       - name: Upload asset to Release
         uses: softprops/action-gh-release@v2
