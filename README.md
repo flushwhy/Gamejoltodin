@@ -30,8 +30,10 @@ All core logic is written in Odin, leveraging its safety and performance; only t
 
 ### Prerequisites
 - [Odin Compiler](https://odin-lang.org/)
-- `libcurl` development library (installed on your system PATH or environment)
-- **Runtime dependency**: Ensure `libcurl.dll` is available on the system PATH or placed alongside `gamejolt.dll`.
+- `libcurl` development headers and runtime:
+  - **Windows**: `libcurl.lib` / `libcurl.dll` (included with Odin or installed on system PATH).
+  - **Linux (Ubuntu/Debian)**: `sudo apt install libcurl4-openssl-dev build-essential`
+  - **macOS**: `brew install curl` (or default system libcurl)
 
 ### Windows
 Run `build.bat` in a command prompt or PowerShell:
@@ -47,6 +49,38 @@ chmod +x build.sh
 ./build.sh
 ```
 This produces `bin/libgamejolt.dylib` (macOS) or `bin/libgamejolt.so` (Linux).
+
+---
+
+## Testing
+
+Run all tests (Odin unit tests + C ABI integration tests) using the automated test runner:
+
+**Windows:**
+```cmd
+run_tests.bat
+```
+
+**Linux / macOS:**
+```bash
+chmod +x run_tests.sh
+./run_tests.sh
+```
+
+Or run tests individually:
+
+### 1. Odin Unit Tests
+Runs the built-in memory-tracked unit test suite (URL builders, crypto signatures, JSON parsing, memory cleanup, and utilities):
+```cmd
+odin test gamejolt -extra-linker-flags:"C:\odin\vendor\curl\lib\libcurl.lib"
+```
+
+### 2. C ABI Integration Tests
+Compiles and executes the C integration test suite (`tests/test_c_api.c`) to verify struct alignment, header compatibility, and DLL exports:
+```cmd
+gcc -I. tests/test_c_api.c bin/gamejolt.lib -o bin/test_c_api.exe
+.\bin\test_c_api.exe
+```
 
 ---
 
