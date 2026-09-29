@@ -41,7 +41,7 @@ jobs:
           $extractedFolder = Get-ChildItem odin_temp | Select-Object -First 1
           Move-Item "$($extractedFolder.FullName)" "odin"
           Remove-Item odin_temp -Recurse -Force
-          $odinBin = Join-Path (Get-Location) "odin\odin.exe"
+          $odinBin = Join-Path (Get-Location) "odin"
           echo "$odinBin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -49,26 +49,38 @@ jobs:
       - name: Install Odin (macOS)
         if: matrix.platform == 'macos'
         run: |
-          brew install odin
+            response=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/odin-lang/Odin/releases/latest)
+            assetUrl=$(echo "$response" | jq -r '.assets[]? | select(.name | contains("macos")) | .browser_download_url' | head -n1)
+            if [ -z "$assetUrl" ] || [ "$assetUrl" = "null" ]; then
+              echo "Error: No Odin asset found for macOS"
+              exit 1
+            fi
+            curl -L -o odin_archive "$assetUrl"
+            mkdir -p odin
+            tar -xzf odin_archive -C odin --strip-components=1
+            chmod +x odin/odin
+            echo "$(pwd)/odin" >> "$GITHUB_PATH"
+        env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install Odin & Dependencies (Linux)
         if: matrix.platform == 'linux'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libcurl4-openssl-dev build-essential
-          response=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/odin-lang/Odin/releases/latest)
-          assetUrl=$(echo "$response" | jq -r --arg p "linux-amd64" '.assets[]? | select(.name | contains($p)) | .browser_download_url' | head -n1)
-          if [ -z "$assetUrl" ] || [ "$assetUrl" = "null" ]; then
-            echo "Error: No Odin asset found for linux-amd64"
-            exit 1
-          fi
-          curl -L -o odin_archive "$assetUrl"
-          mkdir -p odin
-          tar -xzf odin_archive -C odin --strip-components=1
-          chmod +x odin/odin
-          echo "$(pwd)/odin" >> "$GITHUB_PATH"
+            sudo apt-get update
+            sudo apt-get install -y libcurl4-openssl-dev build-essential libmbedtls-dev
+            response=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/odin-lang/Odin/releases/latest)
+            assetUrl=$(echo "$response" | jq -r --arg p "linux-amd64" '.assets[]? | select(.name | contains($p)) | .browser_download_url' | head -n1)
+            if [ -z "$assetUrl" ] || [ "$assetUrl" = "null" ]; then
+              echo "Error: No Odin asset found for linux-amd64"
+              exit 1
+            fi
+            curl -L -o odin_archive "$assetUrl"
+            mkdir -p odin
+            tar -xzf odin_archive -C odin --strip-components=1
+            chmod +x odin/odin
+            echo "$(pwd)/odin" >> "$GITHUB_PATH"
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run Tests (Windows)
         if: matrix.platform == 'windows'
