@@ -1,16 +1,46 @@
 name: Release
 
+# Flow:
+#   feature branches -> PR into develop
+#   develop          -> PR into main/master  (merge commit, NOT squash)
+#   push to main     -> release-please opens/updates a "release PR"
+#   release PR merged-> release-please tags + creates the GitHub Release,
+#                       then the build jobs below attach the platform zips.
+
 on:
   push:
-    tags:
-      - 'v*'
-  workflow_dispatch:
+    branches:
+      - main
+      - master
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
+  # -------------------------------------------------
+  # 0️⃣ release-please: maintain release PR / cut release
+  # -------------------------------------------------
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.rp.outputs.release_created }}
+      tag_name: ${{ steps.rp.outputs.tag_name }}
+    steps:
+      - name: Run release-please
+        id: rp
+        uses: googleapis/release-please-action@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          target-branch: ${{ github.ref_name }}
+          release-type: simple
+
+  # -------------------------------------------------
+  # Build + attach assets, only when a release was just created
+  # -------------------------------------------------
   build-and-package:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
     strategy:
       fail-fast: false
       matrix:
@@ -31,9 +61,13 @@ jobs:
             lib_prefix: "lib"
             lib_ext: so
     runs-on: ${{ matrix.os }}
+    env:
+      TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
     steps:
-      - name: Checkout repository
+      - name: Checkout repository (at the release tag)
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name }}
 
       # -------------------------------------------------
       # 1️⃣ Install Odin (Windows)
@@ -74,12 +108,12 @@ jobs:
         run: |
           response=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/odin-lang/Odin/releases/latest)
           assetUrl=$(echo "$response" | jq -r --arg p "linux-amd64" '.assets[]? | select(.name | contains($p)) | .browser_download_url' | head -n1)
-          
+
           if [ -z "$assetUrl" ] || [ "$assetUrl" = "null" ]; then
             echo "Error: No Odin asset found for linux-amd64"
             exit 1
           fi
-          
+
           curl -L -o odin_archive "$assetUrl"
           mkdir -p odin
           tar -xzf odin_archive -C odin --strip-components=1
@@ -119,7 +153,7 @@ jobs:
         id: zip_windows
         shell: pwsh
         run: |
-          $version = "${{ github.ref_name }}" -replace '^v',''
+          $version = $env:TAG_NAME -replace '^v',''
           $zipName = "odinJolt_${version}_windows.zip"
           $files = @("bin\gamejolt.dll", "gamejolt.h", "README.md", ".gitignore")
           $validFiles = $files | Where-Object { Test-Path $_ }
@@ -131,7 +165,7 @@ jobs:
         id: zip_unix
         shell: bash
         run: |
-          version="${GITHUB_REF_NAME#v}"
+          version="${TAG_NAME#v}"
           zipName="odinJolt_${version}_${{ matrix.platform }}.zip"
           # Uses the correct bin/ directory and lib prefix (e.g., bin/libgamejolt.so)
           zip -j "$zipName" "bin/${{ matrix.lib_prefix }}gamejolt.${{ matrix.lib_ext }}" gamejolt.h README.md .gitignore
@@ -140,11 +174,10 @@ jobs:
       # -------------------------------------------------
       # 5️⃣ Publish the zip as a GitHub Release
       # -------------------------------------------------
-      - name: Publish Release
+      - name: Upload asset to Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: "OdinJolt ${{ github.ref_name }}"
+          tag_name: ${{ needs.release-please.outputs.tag_name }}
           files: ${{ steps.zip_windows.outputs.zip_name || steps.zip_unix.outputs.zip_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
