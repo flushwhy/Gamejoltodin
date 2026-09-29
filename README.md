@@ -9,6 +9,7 @@ An Odin wrapper for the GameJolt API v1.2, exposing a flat C ABI/header interfac
   - `c_api.odin` - C ABI wrapper exports and structure translations.
   - `types.odin` - Data types and C-compatible structures.
   - `utils.odin` - High-level gameplay utilities (user avatars, pictures, trophy checks, score formatting, data increments).
+  - `utils.odin` - High-level gameplay utilities (user avatars, pictures, trophy checks, score formatting, data increments).
   - `internal.odin` - Request signing, libcurl integration, and parsing utilities.
 - `gamejolt.h` - Flat C ABI header file for engine integration.
 - `build.bat` - Compilation script for Windows (produces `bin/gamejolt.dll`).
@@ -22,7 +23,11 @@ To ensure perfect ABI compatibility and safety:
 3. **No Dynamic Pointers:** Strings returned to C are copied into fixed-size byte buffers provided in the structures or caller-supplied output buffers.
 4. **Caller-Provided Buffers:** All array and string queries (`gj_trophies_fetch_c`, `gj_scores_fetch_c`, `gj_data_get_user_picture_c`, etc.) accept an output buffer and capacity, returning total count.
 
+3. **No Dynamic Pointers:** Strings returned to C are copied into fixed-size byte buffers provided in the structures or caller-supplied output buffers.
+4. **Caller-Provided Buffers:** All array and string queries (`gj_trophies_fetch_c`, `gj_scores_fetch_c`, `gj_data_get_user_picture_c`, etc.) accept an output buffer and capacity, returning total count.
+
 All core logic is written in Odin, leveraging its safety and performance; only the thin C‑ABI layer converts data to plain C types for external consumption.
+
 
 ---
 
@@ -128,6 +133,7 @@ int main() {
     int32_t err = gj_login_c(&session, "username", "token", &user);
     if (err == 0) {
         printf("Logged in user: %s (ID: %d)\n", user.username, user.id);
+        printf("Logged in user: %s (ID: %d)\n", user.username, user.id);
         
         // Open session
         gj_session_open_c(&session);
@@ -149,11 +155,28 @@ int main() {
         printf("Formatted score: %s\n", formatted_score);
         
         // Close session
+        // Get user picture (data-store or avatar URL fallback)
+        char pic_url[256] = {0};
+        gj_data_get_user_picture_c(&session, pic_url, sizeof(pic_url));
+        printf("User Picture: %s\n", pic_url);
+
+        // Check a trophy
+        bool unlocked = false;
+        gj_has_trophy_c(&session, 12345, &unlocked);
+        printf("Trophy 12345 unlocked: %s\n", unlocked ? "yes" : "no");
+
+        // Format a score
+        char formatted_score[64] = {0};
+        gj_score_format_c(5000000, formatted_score, sizeof(formatted_score));
+        printf("Formatted score: %s\n", formatted_score);
+        
+        // Close session
         gj_session_close_c(&session);
     } else {
         printf("Login failed with error code: %d\n", err);
     }
     
+    // 3. Destroy session
     // 3. Destroy session
     gj_destroy_c(&session);
     return 0;
@@ -189,9 +212,24 @@ main :: proc() {
         // Utility: Increment a death counter in data-store
         deaths, _ := gamejolt.gj_data_increment(&session, "deaths", 1, user = true)
         fmt.printf("Current deaths: %d\n", deaths)
+        fmt.printf("Logged in user: %s (ID: %d)\n", user.username, user.id)
+        
+        // Utility: Fetch picture or avatar fallback
+        pic, _ := gamejolt.gj_data_get_user_picture(&session)
+        defer delete(pic)
+        fmt.printf("User picture: %s\n", pic)
+
+        // Utility: Check if a trophy has been earned
+        has_it, _ := gamejolt.gj_has_trophy(&session, 12345)
+        fmt.printf("Trophy 12345 unlocked: %v\n", has_it)
+
+        // Utility: Increment a death counter in data-store
+        deaths, _ := gamejolt.gj_data_increment(&session, "deaths", 1, user = true)
+        fmt.printf("Current deaths: %d\n", deaths)
     } else {
         fmt.printfln("Login failed: %v", err)
     }
 }
 ```
+
 
