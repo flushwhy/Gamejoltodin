@@ -9,16 +9,27 @@ echo "============================================================"
 echo "  1. Running Odin Unit Tests"
 echo "============================================================"
 
+EXTRA_ODIN_FLAGS=""
 CURL_FLAGS="-lcurl"
+
 if [ "$(uname -s)" = "Darwin" ]; then
-    if [ -d "/opt/homebrew/opt/curl/lib" ]; then
-        CURL_FLAGS="-L/opt/homebrew/opt/curl/lib -lcurl"
-    elif [ -d "/usr/local/opt/curl/lib" ]; then
-        CURL_FLAGS="-L/usr/local/opt/curl/lib -lcurl"
+    ARCH=$(uname -m)
+    if [ "$ARCH" = "arm64" ]; then
+        echo "Detected macOS ARM64 (Apple Silicon)..."
+        EXTRA_ODIN_FLAGS="-target:darwin_arm64"
+        if [ -d "/opt/homebrew/opt/curl/lib" ]; then
+            CURL_FLAGS="-L/opt/homebrew/opt/curl/lib -lcurl"
+        fi
+    else
+        echo "Detected macOS x86_64 (Intel)..."
+        EXTRA_ODIN_FLAGS="-target:darwin_amd64"
+        if [ -d "/usr/local/opt/curl/lib" ]; then
+            CURL_FLAGS="-L/usr/local/opt/curl/lib -lcurl"
+        fi
     fi
 fi
 
-odin test gamejolt -extra-linker-flags:"$CURL_FLAGS"
+odin test gamejolt $EXTRA_ODIN_FLAGS -extra-linker-flags:"$CURL_FLAGS"
 
 echo ""
 echo "============================================================"
@@ -33,7 +44,15 @@ echo "============================================================"
 
 case "$(uname -s)" in
     Darwin)
-        cc -I. tests/test_c_api.c -Lbin -lgamejolt -Wl,-rpath,@loader_path/ -o bin/test_c_api
+        ARCH=$(uname -m)
+        CC_ARCH_FLAG=""
+        if [ "$ARCH" = "arm64" ]; then
+            CC_ARCH_FLAG="-arch arm64"
+        else
+            CC_ARCH_FLAG="-arch x86_64"
+        fi
+
+        cc $CC_ARCH_FLAG -I. tests/test_c_api.c -Lbin -lgamejolt -Wl,-rpath,@loader_path/ -o bin/test_c_api
         ;;
     Linux)
         cc -I. tests/test_c_api.c -Lbin -lgamejolt -Wl,-rpath,'$ORIGIN/' -o bin/test_c_api

@@ -32,11 +32,6 @@ jobs:
         if: matrix.platform == 'windows'
         shell: pwsh
         run: |
-          # Install vcpkg for dependency management
-          git clone https://github.com/Microsoft/vcpkg.git
-          .\vcpkg\bootstrap-vcpkg.bat
-          .\vcpkg\vcpkg install curl:x64-windows
-          
           $headers = @{ "Authorization" = "token $($env:GITHUB_TOKEN)" }
           $release = Invoke-RestMethod -Uri "https://api.github.com/repos/odin-lang/Odin/releases/latest" -Headers $headers
           $asset = $release.assets | Where-Object { $_.name -like "*${{ matrix.odin_platform }}*" } | Select-Object -First 1
@@ -50,9 +45,11 @@ jobs:
           echo "$odinBin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Install Odin (macOS)
+
+      - name: Install Odin & Dependencies (macOS)
         if: matrix.platform == 'macos'
         run: |
+            brew install curl
             response=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/odin-lang/Odin/releases/latest)
             assetUrl=$(echo "$response" | jq -r '.assets[]? | select(.name | contains("macos")) | .browser_download_url' | head -n1)
             if [ -z "$assetUrl" ] || [ "$assetUrl" = "null" ]; then
