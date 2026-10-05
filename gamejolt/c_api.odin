@@ -356,3 +356,148 @@ gj_data_keys_c :: proc "c" (
     }
     return 0
 }
+
+// -----------------------------------------------------------------------
+//  C ABI exports — Utilities
+// -----------------------------------------------------------------------
+
+@(export)
+gj_is_logged_in_c :: proc "c" (session: ^GJ_Session) -> b8 {
+    context = runtime.default_context()
+    return b8(gj_is_logged_in(session))
+}
+
+@(export)
+gj_session_username_c :: proc "c" (
+    session:  ^GJ_Session,
+    out_buf:  [^]u8,
+    capacity: i32,
+) -> i32 {
+    context = runtime.default_context()
+    if !gj_is_logged_in(session) do return i32(GJ_Error.Not_Authenticated)
+    uname := gj_session_username(session)
+    if out_buf != nil && capacity > 0 {
+        _copy_to_buf(out_buf[:capacity], uname)
+    }
+    return 0
+}
+
+@(export)
+gj_get_current_user_c :: proc "c" (
+    session:  ^GJ_Session,
+    out_user: ^GJ_User_C,
+) -> i32 {
+    context = runtime.default_context()
+    user, err := gj_get_current_user(session, context.temp_allocator)
+    if err != .None do return i32(err)
+    if out_user != nil do out_user^ = _user_to_c(user)
+    return 0
+}
+
+@(export)
+gj_get_user_avatar_url_c :: proc "c" (
+    session:  ^GJ_Session,
+    out_buf:  [^]u8,
+    capacity: i32,
+) -> i32 {
+    context = runtime.default_context()
+    url, err := gj_get_user_avatar_url(session, context.temp_allocator)
+    if err != .None do return i32(err)
+    if out_buf != nil && capacity > 0 {
+        _copy_to_buf(out_buf[:capacity], url)
+    }
+    return 0
+}
+
+@(export)
+gj_data_get_user_picture_c :: proc "c" (
+    session:  ^GJ_Session,
+    out_buf:  [^]u8,
+    capacity: i32,
+) -> i32 {
+    context = runtime.default_context()
+    pic, err := gj_data_get_user_picture(session, context.temp_allocator)
+    if err != .None do return i32(err)
+    if out_buf != nil && capacity > 0 {
+        _copy_to_buf(out_buf[:capacity], pic)
+    }
+    return 0
+}
+
+@(export)
+gj_data_set_user_picture_c :: proc "c" (
+    session:      ^GJ_Session,
+    picture_data: cstring,
+) -> i32 {
+    context = runtime.default_context()
+    return i32(gj_data_set_user_picture(session, string(picture_data)))
+}
+
+@(export)
+gj_data_get_int_c :: proc "c" (
+    session:     ^GJ_Session,
+    key:         cstring,
+    default_val: i32,
+    user:        b8,
+    out_val:     ^i32,
+) -> i32 {
+    context = runtime.default_context()
+    val, err := gj_data_get_int(session, string(key), int(default_val), bool(user))
+    if err != .None do return i32(err)
+    if out_val != nil do out_val^ = i32(val)
+    return 0
+}
+
+@(export)
+gj_data_set_int_c :: proc "c" (
+    session: ^GJ_Session,
+    key:     cstring,
+    value:   i32,
+    user:    b8,
+) -> i32 {
+    context = runtime.default_context()
+    return i32(gj_data_set_int(session, string(key), int(value), bool(user)))
+}
+
+@(export)
+gj_data_increment_c :: proc "c" (
+    session: ^GJ_Session,
+    key:     cstring,
+    delta:   i32,
+    user:    b8,
+    out_val: ^i32,
+) -> i32 {
+    context = runtime.default_context()
+    new_val, err := gj_data_increment(session, string(key), int(delta), bool(user))
+    if err != .None do return i32(err)
+    if out_val != nil do out_val^ = i32(new_val)
+    return 0
+}
+
+@(export)
+gj_has_trophy_c :: proc "c" (
+    session:      ^GJ_Session,
+    trophy_id:    i32,
+    out_achieved: ^b8,
+) -> i32 {
+    context = runtime.default_context()
+    achieved, err := gj_has_trophy(session, int(trophy_id))
+    if err != .None do return i32(err)
+    if out_achieved != nil do out_achieved^ = b8(achieved)
+    return 0
+}
+
+@(export)
+gj_score_format_c :: proc "c" (
+    sort:     i32,
+    out_buf:  [^]u8,
+    capacity: i32,
+) -> i32 {
+    context = runtime.default_context()
+    formatted := gj_score_format(int(sort), context.temp_allocator)
+    if out_buf != nil && capacity > 0 {
+        _copy_to_buf(out_buf[:capacity], formatted)
+    }
+    return 0
+}
+

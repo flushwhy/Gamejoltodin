@@ -31,6 +31,20 @@
 extern "C" {
 #endif
 
+#if defined(_WIN32) || defined(__CYGWIN__)
+    #if defined(GAMEJOLT_BUILD_DLL)
+        #define GAMEJOLT_API __declspec(dllexport)
+    #elif defined(GAMEJOLT_USE_DLL)
+        #define GAMEJOLT_API __declspec(dllimport)
+    #else
+        #define GAMEJOLT_API
+    #endif
+#elif defined(__GNUC__) && __GNUC__ >= 4
+    #define GAMEJOLT_API __attribute__((visibility("default")))
+#else
+    #define GAMEJOLT_API
+#endif
+
 /* -----------------------------------------------------------------------
    Structs
    ----------------------------------------------------------------------- */
@@ -205,6 +219,60 @@ int32_t gj_data_keys_c(
     int32_t       capacity,
     int32_t*      out_count   /* may be NULL */
 );
+
+/* -----------------------------------------------------------------------
+   Utilities
+   ----------------------------------------------------------------------- */
+
+/* Check if the session is currently authenticated. */
+bool gj_is_logged_in_c(const GJ_Session* session);
+
+/* Read cached username from session. */
+int32_t gj_session_username_c(const GJ_Session* session, char* out_buf, int32_t capacity);
+
+/* Re-fetch current user profile info without logging in again. */
+int32_t gj_get_current_user_c(GJ_Session* session, GJ_User_C* out_user);
+
+/* Fetch avatar URL of currently logged-in user. */
+int32_t gj_get_user_avatar_url_c(GJ_Session* session, char* out_buf, int32_t capacity);
+
+/* Fetch user picture: checks user data-store "user_picture", falls back to avatar URL. */
+int32_t gj_data_get_user_picture_c(GJ_Session* session, char* out_buf, int32_t capacity);
+
+/* Save custom user picture data/URL to user data-store "user_picture". */
+int32_t gj_data_set_user_picture_c(GJ_Session* session, const char* picture_data);
+
+/* Read an integer value from the data store. */
+int32_t gj_data_get_int_c(
+    GJ_Session* session,
+    const char* key,
+    int32_t     default_val,
+    bool        user,
+    int32_t*    out_val
+);
+
+/* Write an integer value to the data store. */
+int32_t gj_data_set_int_c(
+    GJ_Session* session,
+    const char* key,
+    int32_t     value,
+    bool        user
+);
+
+/* Atomically increment an integer in the data store. */
+int32_t gj_data_increment_c(
+    GJ_Session* session,
+    const char* key,
+    int32_t     delta,
+    bool        user,
+    int32_t*    out_val
+);
+
+/* Check if a specific trophy is already unlocked by the user. */
+int32_t gj_has_trophy_c(GJ_Session* session, int32_t trophy_id, bool* out_achieved);
+
+/* Format a score sort integer with commas (e.g. 1000000 -> "1,000,000"). */
+int32_t gj_score_format_c(int32_t sort, char* out_buf, int32_t capacity);
 
 #ifdef __cplusplus
 }
