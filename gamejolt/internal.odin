@@ -9,11 +9,6 @@ import "core:strconv"
 import "core:strings"
 import "vendor:curl"
 
-// The Odin curl vendor package disables the default static CRT library on
-// Windows. Link the Universal CRT explicitly for standard C memory routines.
-when ODIN_OS == .Windows {
-    foreign import ucrt "system:ucrt.lib"
-}
 
 // -----------------------------------------------------------------------
 //  Constants
