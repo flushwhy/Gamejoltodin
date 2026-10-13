@@ -51,6 +51,10 @@ jobs:
         with:
           ref: ${{ needs.release-please.outputs.tag_name }}
 
+      - name: Prepare MSVC environment (Windows)
+        if: matrix.platform == 'windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
       - name: Install native dependencies (Windows)
         if: matrix.platform == 'windows'
         shell: pwsh
@@ -105,26 +109,34 @@ jobs:
           chmod +x "$RUNNER_TEMP/odin/odin"
           echo "$RUNNER_TEMP/odin" >> "$GITHUB_PATH"
 
-      - name: Build shared library
+      - name: Build shared library (Windows)
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: .\build.bat
+
+      - name: Build shared library (Linux/macOS)
+        if: matrix.platform != 'windows'
         shell: bash
         run: |
-          if [ "${{ matrix.platform }}" = "windows" ]; then
-            ./build.bat
-          else
-            chmod +x ./build.sh
-            ./build.sh
-          fi
+          chmod +x ./build.sh
+          ./build.sh
 
-      - name: Package release artifact
+      - name: Package release artifact (Windows)
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          $version = $env:TAG_NAME -replace '^v', ''
+          $archive = "odinJolt_$($version)_windows.zip"
+          Compress-Archive -Path bin\gamejolt.dll, gamejolt.h, README.md -DestinationPath $archive -Force
+          "RELEASE_ARCHIVE=$archive" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Package release artifact (Linux/macOS)
+        if: matrix.platform != 'windows'
         shell: bash
         run: |
           version="${TAG_NAME#v}"
           archive="odinJolt_${version}_${{ matrix.platform }}.zip"
-          if [ "${{ matrix.platform }}" = "windows" ]; then
-            7z a "$archive" bin/gamejolt.dll gamejolt.h README.md
-          else
-            zip -j "$archive" "${{ matrix.lib_path }}" gamejolt.h README.md
-          fi
+          zip -j "$archive" "${{ matrix.lib_path }}" gamejolt.h README.md
           echo "RELEASE_ARCHIVE=$archive" >> "$GITHUB_ENV"
 
       - name: Upload release artifact
