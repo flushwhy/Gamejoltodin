@@ -11,11 +11,10 @@ if not exist "%OUT_DIR%" mkdir "%OUT_DIR%"
 
 echo Building for Windows...
 
-:: Default linker flag for libcurl
 set "CURL_LINK_FLAGS=-extra-linker-flags:libcurl.lib"
-
-:: Check common libcurl.lib search locations on Windows
-if exist "deps\curl\lib\libcurl.lib" (
+if exist "odin\vendor\curl\lib\libcurl.lib" (
+    set "CURL_LINK_FLAGS=-extra-linker-flags:"/LIBPATH:odin\vendor\curl\lib libcurl.lib""
+) else if exist "deps\curl\lib\libcurl.lib" (
     set "CURL_LINK_FLAGS=-extra-linker-flags:"/LIBPATH:deps\curl\lib libcurl.lib""
 ) else if exist "vendor\curl\lib\libcurl.lib" (
     set "CURL_LINK_FLAGS=-extra-linker-flags:"/LIBPATH:vendor\curl\lib libcurl.lib""
