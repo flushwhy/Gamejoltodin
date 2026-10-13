@@ -1,183 +1,136 @@
 name: Release
 
-# Flow:
-#   feature branches -> PR into develop
-#   develop          -> PR into main/master  (merge commit, NOT squash)
-#   push to main     -> release-please opens/updates a "release PR"
-#   release PR merged-> release-please tags + creates the GitHub Release,
-#                       then the build jobs below attach the platform zips.
-
 on:
   push:
-    branches:
-      - main
-      - master
+    branches: [master]
 
 permissions:
   contents: write
   pull-requests: write
 
+concurrency:
+  group: release-please-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
-  # -------------------------------------------------
-  # 0️⃣ release-please: maintain release PR / cut release
-  # -------------------------------------------------
   release-please:
     runs-on: ubuntu-latest
     outputs:
-      release_created: ${{ steps.rp.outputs.release_created }}
-      tag_name: ${{ steps.rp.outputs.tag_name }}
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
-      - name: Run release-please
-        id: rp
+      - name: Create or update release PR
+        id: release
         uses: googleapis/release-please-action@v4
         with:
+          config-file: release-please-config.json
           token: ${{ secrets.GITHUB_TOKEN }}
-          target-branch: ${{ github.ref_name }}
-          release-type: simple
 
-  # -------------------------------------------------
-  # Build + attach assets, only when a release was just created
-  # -------------------------------------------------
   build-and-package:
     needs: release-please
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: windows-latest
             platform: windows
-            odin_platform: windows-amd64
-            lib_prefix: ""
-            lib_ext: dll
+            lib_path: bin/gamejolt.dll
           - os: macos-latest
             platform: macos
-            odin_platform: macos-amd64
-            lib_prefix: "lib"
-            lib_ext: dylib
+            lib_path: bin/libgamejolt.dylib
           - os: ubuntu-latest
             platform: linux
-            odin_platform: linux-amd64
-            lib_prefix: "lib"
-            lib_ext: so
-    runs-on: ${{ matrix.os }}
+            lib_path: bin/libgamejolt.so
     env:
       TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
     steps:
-      - name: Checkout repository (at the release tag)
+      - name: Check out released source
         uses: actions/checkout@v4
         with:
           ref: ${{ needs.release-please.outputs.tag_name }}
 
-      # -------------------------------------------------
-      # 1️⃣ Install Odin (Windows)
-      # -------------------------------------------------
+      - name: Install native dependencies (Windows)
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: choco install curl -y --no-progress
+
+      - name: Install native dependencies (Linux)
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes build-essential libcurl4-openssl-dev
+
+      - name: Install native dependencies (macOS)
+        if: matrix.platform == 'macos'
+        run: brew install curl
+
       - name: Install Odin (Windows)
         if: matrix.platform == 'windows'
         shell: pwsh
         run: |
-          $headers = @{ "Authorization" = "token $($env:GITHUB_TOKEN)" }
-          $release = Invoke-RestMethod -Uri "https://api.github.com/repos/odin-lang/Odin/releases/latest" -Headers $headers
-          $asset = $release.assets | Where-Object { $_.name -like "*${{ matrix.odin_platform }}*" } | Select-Object -First 1
-          if (-not $asset) { throw "No Odin asset found for ${{ matrix.odin_platform }}" }
-          Invoke-WebRequest -Uri $asset.browser_download_url -OutFile odin_archive
-          Expand-Archive odin_archive -DestinationPath odin_temp -Force
-          $extractedFolder = Get-ChildItem odin_temp | Select-Object -First 1
-          Move-Item "$($extractedFolder.FullName)" "odin"
-          Remove-Item odin_temp -Recurse -Force
-          $odinBin = Join-Path (Get-Location) "odin\odin.exe"
-          echo "$odinBin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          $release = Invoke-RestMethod -Uri "https://api.github.com/repos/odin-lang/Odin/releases/latest"
+          $asset = $release.assets | Where-Object { $_.name -like "*windows-amd64*" -and $_.name -match "\.zip$" } | Select-Object -First 1
+          if (-not $asset) { throw "No Windows Odin archive found" }
+          Invoke-WebRequest -Uri $asset.browser_download_url -OutFile odin.zip
+          Expand-Archive odin.zip -DestinationPath odin-temp -Force
+          $folder = Get-ChildItem odin-temp | Select-Object -First 1
+          Move-Item $folder.FullName "odin"
+          "${{ github.workspace }}\odin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
-      # -------------------------------------------------
-      # 1️⃣ Install Odin (macOS via Homebrew) 🍺
-      # -------------------------------------------------
-      - name: Install Odin (macOS)
-        if: matrix.platform == 'macos'
+      - name: Install Odin (Linux/macOS)
+        if: matrix.platform != 'windows'
         shell: bash
         run: |
-          brew install odin
-
-      # -------------------------------------------------
-      # 1️⃣ Install Odin (Linux)
-      # -------------------------------------------------
-      - name: Install Odin (Linux)
-        if: matrix.platform == 'linux'
-        shell: bash
-        run: |
-          response=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/odin-lang/Odin/releases/latest)
-          assetUrl=$(echo "$response" | jq -r --arg p "linux-amd64" '.assets[]? | select(.name | contains($p)) | .browser_download_url' | head -n1)
-
-          if [ -z "$assetUrl" ] || [ "$assetUrl" = "null" ]; then
-            echo "Error: No Odin asset found for linux-amd64"
+          set -euo pipefail
+          case "$(uname -s)" in
+            Linux) platform="linux-amd64" ;;
+            Darwin)
+              case "$(uname -m)" in
+                arm64) platform="macos-arm64" ;;
+                *) platform="macos-amd64" ;;
+              esac
+              ;;
+          esac
+          response="$(curl --fail --silent --show-error https://api.github.com/repos/odin-lang/Odin/releases/latest)"
+          asset_url="$(printf '%s' "$response" | jq -r --arg platform "$platform" '.assets[]? | select(.name | contains($platform)) | select(.name | test("\\.tar\\.(gz|xz)$")) | .browser_download_url' | head -n 1)"
+          if [ -z "$asset_url" ] || [ "$asset_url" = "null" ]; then
+            echo "No Odin archive found for $platform" >&2
             exit 1
           fi
+          mkdir -p "$RUNNER_TEMP/odin"
+          curl --fail --location --silent --show-error "$asset_url" -o "$RUNNER_TEMP/odin-archive"
+          tar -xf "$RUNNER_TEMP/odin-archive" -C "$RUNNER_TEMP/odin" --strip-components=1
+          chmod +x "$RUNNER_TEMP/odin/odin"
+          echo "$RUNNER_TEMP/odin" >> "$GITHUB_PATH"
 
-          curl -L -o odin_archive "$assetUrl"
-          mkdir -p odin
-          tar -xzf odin_archive -C odin --strip-components=1
-          chmod +x odin/odin
-          echo "$(pwd)/odin" >> "$GITHUB_PATH"
-
-      # -------------------------------------------------
-      # 2️⃣ Install Linux Dependencies
-      # -------------------------------------------------
-      - name: Install Linux Dependencies
-        if: matrix.platform == 'linux'
+      - name: Build shared library
         shell: bash
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libcurl4-openssl-dev libmbedtls-dev
+          if [ "${{ matrix.platform }}" = "windows" ]; then
+            ./build.bat
+          else
+            chmod +x ./build.sh
+            ./build.sh
+          fi
 
-      # -------------------------------------------------
-      # 3️⃣ Build the shared library
-      # -------------------------------------------------
-      - name: Build GameJolt library (Windows)
-        if: matrix.platform == 'windows'
-        shell: pwsh
-        run: .\build.bat
-
-      - name: Build GameJolt library (macOS/Linux)
-        if: matrix.platform != 'windows'
-        shell: bash
-        run: |
-          chmod +x ./build.sh
-          ./build.sh
-
-      # -------------------------------------------------
-      # 4️⃣ Create the zip archive
-      # -------------------------------------------------
-      - name: Create release zip (Windows)
-        if: matrix.platform == 'windows'
-        id: zip_windows
-        shell: pwsh
-        run: |
-          $version = $env:TAG_NAME -replace '^v',''
-          $zipName = "odinJolt_${version}_windows.zip"
-          $files = @("bin\gamejolt.dll", "gamejolt.h", "README.md", ".gitignore")
-          $validFiles = $files | Where-Object { Test-Path $_ }
-          Compress-Archive -Path $validFiles -DestinationPath $zipName -Force
-          echo "zip_name=$zipName" >> $env:GITHUB_OUTPUT
-
-      - name: Create release zip (macOS/Linux)
-        if: matrix.platform != 'windows'
-        id: zip_unix
+      - name: Package release artifact
         shell: bash
         run: |
           version="${TAG_NAME#v}"
-          zipName="odinJolt_${version}_${{ matrix.platform }}.zip"
-          # Uses the correct bin/ directory and lib prefix (e.g., bin/libgamejolt.so)
-          zip -j "$zipName" "bin/${{ matrix.lib_prefix }}gamejolt.${{ matrix.lib_ext }}" gamejolt.h README.md .gitignore
-          echo "zip_name=$zipName" >> "$GITHUB_OUTPUT"
+          archive="odinJolt_${version}_${{ matrix.platform }}.zip"
+          if [ "${{ matrix.platform }}" = "windows" ]; then
+            7z a "$archive" bin/gamejolt.dll gamejolt.h README.md
+          else
+            zip -j "$archive" "${{ matrix.lib_path }}" gamejolt.h README.md
+          fi
+          echo "RELEASE_ARCHIVE=$archive" >> "$GITHUB_ENV"
 
-      # -------------------------------------------------
-      # 5️⃣ Publish the zip as a GitHub Release
-      # -------------------------------------------------
-      - name: Upload asset to Release
+      - name: Upload release artifact
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.release-please.outputs.tag_name }}
-          files: ${{ steps.zip_windows.outputs.zip_name || steps.zip_unix.outputs.zip_name }}
+          files: ${{ env.RELEASE_ARCHIVE }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
