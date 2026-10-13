@@ -11,25 +11,25 @@ if not exist "%OUT_DIR%" mkdir "%OUT_DIR%"
 
 echo Building for Windows...
 
-:: vendor:curl disables the dynamic MSVC CRT default library. Explicitly link
-:: the static CRT so shared-library builds resolve memcpy/memmove/memset.
-set "CURL_LINK_FLAGS=-extra-linker-flags:"/DEFAULTLIB:libcmt libcurl.lib""
+:: vendor:curl disables libcmt on Windows; gamejolt/internal.odin explicitly
+:: imports ucrt.lib to resolve the standard C memory routines.
+set "CURL_LINK_FLAGS=-extra-linker-flags:"libcurl.lib""
 
 if defined GAMEJOLT_CURL_LIB_DIR (
     if exist "%GAMEJOLT_CURL_LIB_DIR%\libcurl.lib" (
-        set "CURL_LINK_FLAGS=-extra-linker-flags:"/DEFAULTLIB:libcmt /LIBPATH:%GAMEJOLT_CURL_LIB_DIR% libcurl.lib""
+        set "CURL_LINK_FLAGS=-extra-linker-flags:"/LIBPATH:%GAMEJOLT_CURL_LIB_DIR% libcurl.lib""
     )
 ) else if exist "odin\vendor\curl\lib\libcurl.lib" (
-    set "CURL_LINK_FLAGS=-extra-linker-flags:"/DEFAULTLIB:libcmt /LIBPATH:odin\vendor\curl\lib libcurl.lib""
+    set "CURL_LINK_FLAGS=-extra-linker-flags:"/LIBPATH:odin\vendor\curl\lib libcurl.lib""
 ) else if exist "deps\curl\lib\libcurl.lib" (
-    set "CURL_LINK_FLAGS=-extra-linker-flags:"/DEFAULTLIB:libcmt /LIBPATH:deps\curl\lib libcurl.lib""
+    set "CURL_LINK_FLAGS=-extra-linker-flags:"/LIBPATH:deps\curl\lib libcurl.lib""
 ) else if exist "vendor\curl\lib\libcurl.lib" (
-    set "CURL_LINK_FLAGS=-extra-linker-flags:"/DEFAULTLIB:libcmt /LIBPATH:vendor\curl\lib libcurl.lib""
+    set "CURL_LINK_FLAGS=-extra-linker-flags:"/LIBPATH:vendor\curl\lib libcurl.lib""
 ) else if exist "C:\odin\vendor\curl\lib\libcurl.lib" (
-    set "CURL_LINK_FLAGS=-extra-linker-flags:"/DEFAULTLIB:libcmt /LIBPATH:C:\odin\vendor\curl\lib libcurl.lib""
+    set "CURL_LINK_FLAGS=-extra-linker-flags:"/LIBPATH:C:\odin\vendor\curl\lib libcurl.lib""
 ) else if defined VCPKG_INSTALLATION_ROOT (
     if exist "%VCPKG_INSTALLATION_ROOT%\x64-windows\lib\libcurl.lib" (
-        set "CURL_LINK_FLAGS=-extra-linker-flags:"/DEFAULTLIB:libcmt /LIBPATH:%VCPKG_INSTALLATION_ROOT%\x64-windows\lib libcurl.lib""
+        set "CURL_LINK_FLAGS=-extra-linker-flags:"/LIBPATH:%VCPKG_INSTALLATION_ROOT%\x64-windows\lib libcurl.lib""
     )
 )
 
