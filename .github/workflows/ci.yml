@@ -83,7 +83,7 @@ jobs:
               esac
               ;;
           esac
-          response="$(curl --fail --silent --show-error https://api.github.com/repos/odin-lang/Odin/releases/latest)"
+          response="$(curl --fail --silent --show-error https://api.github.com/repos/odin-lang/Odin/releases/latest"
           asset_url="$(printf '%s' "$response" | jq -r --arg platform "$platform" '.assets[]? | select(.name | contains($platform)) | select(.name | test("\\.tar\\.(gz|xz)$")) | .browser_download_url' | head -n 1)"
           if [ -z "$asset_url" ] || [ "$asset_url" = "null" ]; then
             echo "No Odin archive found for $platform" >&2
