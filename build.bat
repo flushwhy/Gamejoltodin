@@ -34,6 +34,7 @@ if not defined GAMEJOLT_CURL_LIB_DIR if exist "odin\vendor\curl\lib\libcurl.lib"
 odin build %PACKAGE% ^
     -build-mode:shared ^
     -no-entry-point ^
+    -use-single-module ^
     -out:%OUT_DIR%\gamejolt.dll ^
     %CURL_LINK_FLAGS% ^
     -o:speed
