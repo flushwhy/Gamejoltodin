@@ -2,99 +2,116 @@ name: CI
 
 on:
   push:
-    branches: [ main, master, develop, "Feat-*" ]
+    branches: [master]
   pull_request:
-    branches: [ main, master, develop ]
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
     name: Test (${{ matrix.platform }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: windows-latest
             platform: windows
-            odin_platform: windows-amd64
           - os: ubuntu-latest
             platform: linux
-            odin_platform: linux-amd64
           - os: macos-latest
             platform: macos
 
-    runs-on: ${{ matrix.os }}
-
     steps:
-      - name: Checkout code
+      - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Install Odin & Dependencies (Windows)
+      - name: Prepare MSVC environment
+        if: matrix.platform == 'windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Install curl (Windows)
         if: matrix.platform == 'windows'
         shell: pwsh
         run: |
-          # Install curl via Chocolatey to get headers and import libraries
-          choco install curl -y
-          
-          # Fetch and unpack latest Odin release
-          $headers = @{ "Authorization" = "token $($env:GITHUB_TOKEN)" }
-          $release = Invoke-RestMethod -Uri "https://api.github.com/repos/odin-lang/Odin/releases/latest" -Headers $headers
-          $asset = $release.assets | Where-Object { $_.name -like "*${{ matrix.odin_platform }}*" } | Select-Object -First 1
-          if (-not $asset) { throw "No Odin asset found for ${{ matrix.odin_platform }}" }
-          Invoke-WebRequest -Uri $asset.browser_download_url -OutFile odin_archive
-          Expand-Archive odin_archive -DestinationPath odin_temp -Force
-          $extractedFolder = Get-ChildItem odin_temp | Select-Object -First 1
-          Move-Item "$($extractedFolder.FullName)" "odin"
-          Remove-Item odin_temp -Recurse -Force
-          $odinBin = Join-Path (Get-Location) "odin"
-          echo "$odinBin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          
-      - name: Install Odin & Dependencies (macOS)
-        if: matrix.platform == 'macos'
-        run: |
-            brew install curl
-            response=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/odin-lang/Odin/releases/latest)
-            assetUrl=$(echo "$response" | jq -r '.assets[]? | select(.name | contains("macos")) | .browser_download_url' | head -n1)
-            if [ -z "$assetUrl" ] || [ "$assetUrl" = "null" ]; then
-              echo "Error: No Odin asset found for macOS"
-              exit 1
-            fi
-            curl -L -o odin_archive "$assetUrl"
-            mkdir -p odin
-            tar -xzf odin_archive -C odin --strip-components=1
-            chmod +x odin/odin
-            echo "$(pwd)/odin" >> "$GITHUB_PATH"
-        env:
-            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          vcpkg install curl:x64-windows
+          $curlRoot = Join-Path $env:VCPKG_INSTALLATION_ROOT "installed\x64-windows"
+          if (-not (Test-Path "$curlRoot\lib\libcurl.lib")) {
+            throw "vcpkg did not install libcurl.lib under $curlRoot"
+          }
+          "GAMEJOLT_CURL_LIB_DIR=$curlRoot\lib" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "$curlRoot\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
-      - name: Install Odin & Dependencies (Linux)
+      - name: Install native dependencies (Linux)
         if: matrix.platform == 'linux'
         run: |
-            sudo apt-get update
-            sudo apt-get install -y libcurl4-openssl-dev build-essential libmbedtls-dev
-            response=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/odin-lang/Odin/releases/latest)
-            assetUrl=$(echo "$response" | jq -r --arg p "linux-amd64" '.assets[]? | select(.name | contains($p)) | .browser_download_url' | head -n1)
-            if [ -z "$assetUrl" ] || [ "$assetUrl" = "null" ]; then
-              echo "Error: No Odin asset found for linux-amd64"
-              exit 1
-            fi
-            curl -L -o odin_archive "$assetUrl"
-            mkdir -p odin
-            tar -xzf odin_archive -C odin --strip-components=1
-            chmod +x odin/odin
-            echo "$(pwd)/odin" >> "$GITHUB_PATH"
-        env:
-            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          sudo apt-get update
+          sudo apt-get install --yes build-essential libcurl4-openssl-dev
 
-      - name: Run Tests (Windows)
+      - name: Install native dependencies (macOS)
+        if: matrix.platform == 'macos'
+        run: brew install curl
+
+      # Pin one known Odin release instead of resolving "latest" through the
+      # GitHub API on every runner (which can be rate-limited or return 403).
+      - name: Install Odin (Windows)
         if: matrix.platform == 'windows'
-        shell: cmd
-        run: run_tests.bat
+        shell: pwsh
+        run: |
+          $url = "https://github.com/odin-lang/Odin/releases/download/dev-2026-10/odin-windows-amd64-dev-2026-10.zip"
+          Invoke-WebRequest -Uri $url -OutFile "$env:RUNNER_TEMP\odin.zip"
+          Expand-Archive "$env:RUNNER_TEMP\odin.zip" -DestinationPath "$env:RUNNER_TEMP\odin" -Force
+          $compiler = Get-ChildItem "$env:RUNNER_TEMP\odin" -Filter odin.exe -Recurse | Select-Object -First 1
+          if (-not $compiler) { throw "odin.exe was not found in the downloaded archive" }
+          $odinRoot = $compiler.Directory.FullName
+          "$odinRoot" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          & $compiler.FullName version
 
-      - name: Run Tests (Linux/macOS)
+      - name: Install Odin (Linux)
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="https://github.com/odin-lang/Odin/releases/download/dev-2026-10/odin-linux-amd64-dev-2026-10.tar.gz"
+          mkdir -p "$RUNNER_TEMP/odin"
+          curl --fail --location --retry 3 --retry-all-errors "$url" -o "$RUNNER_TEMP/odin.tar.gz"
+          tar -xzf "$RUNNER_TEMP/odin.tar.gz" -C "$RUNNER_TEMP/odin" --strip-components=1
+          test -x "$RUNNER_TEMP/odin/odin"
+          echo "$RUNNER_TEMP/odin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/odin/odin" version
+
+      - name: Install Odin (macOS Apple Silicon)
+        if: matrix.platform == 'macos'
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$(uname -m)" in
+            arm64) archive="odin-macos-arm64-dev-2026-10.tar.gz" ;;
+            *) echo "Unsupported macOS runner architecture: $(uname -m)" >&2; exit 1 ;;
+          esac
+          url="https://github.com/odin-lang/Odin/releases/download/dev-2026-10/$archive"
+          mkdir -p "$RUNNER_TEMP/odin"
+          curl --fail --location --retry 3 --retry-all-errors "$url" -o "$RUNNER_TEMP/odin.tar.gz"
+          tar -xzf "$RUNNER_TEMP/odin.tar.gz" -C "$RUNNER_TEMP/odin" --strip-components=1
+          test -x "$RUNNER_TEMP/odin/odin"
+          echo "$RUNNER_TEMP/odin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/odin/odin" version
+
+      - name: Run unit, shared-library, and C ABI tests (Windows)
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: .\run_tests.bat
+
+      - name: Run unit, shared-library, and C ABI tests (Linux/macOS)
         if: matrix.platform != 'windows'
         shell: bash
         run: |
-          chmod +x ./build.sh ./run_tests.sh
+          chmod +x ./run_tests.sh ./build.sh
           ./run_tests.sh
