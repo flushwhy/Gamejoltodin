@@ -14,8 +14,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test-and-build:
-    name: Test and build (${{ matrix.platform }})
+  test:
+    name: Test (${{ matrix.platform }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -31,6 +31,10 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+
+      - name: Prepare MSVC environment (Windows)
+        if: matrix.platform == 'windows'
+        uses: ilammy/msvc-dev-cmd@v1
 
       - name: Install native dependencies (Windows)
         if: matrix.platform == 'windows'
@@ -86,22 +90,14 @@ jobs:
           chmod +x "$RUNNER_TEMP/odin/odin"
           echo "$RUNNER_TEMP/odin" >> "$GITHUB_PATH"
 
-      - name: Run Odin unit tests
-        shell: bash
-        run: |
-          if [ "${{ matrix.platform }}" = "windows" ]; then
-            ./run_tests.bat
-          else
-            chmod +x ./run_tests.sh
-            ./run_tests.sh
-          fi
+      - name: Run test suite
+        shell: pwsh
+        if: matrix.platform == 'windows'
+        run: .\run_tests.bat
 
-      - name: Build shared library
+      - name: Run test suite
+        if: matrix.platform != 'windows'
         shell: bash
         run: |
-          if [ "${{ matrix.platform }}" = "windows" ]; then
-            ./build.bat
-          else
-            chmod +x ./build.sh
-            ./build.sh
-          fi
+          chmod +x ./run_tests.sh ./build.sh
+          ./run_tests.sh
