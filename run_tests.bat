@@ -6,7 +6,11 @@ echo   1. Running Odin Unit Tests
 echo ============================================================
 
 set "CURL_LINK_FLAGS=-extra-linker-flags:libcurl.lib"
-if exist "odin\vendor\curl\lib\libcurl.lib" (
+if defined GAMEJOLT_CURL_LIB_DIR (
+    if exist "%GAMEJOLT_CURL_LIB_DIR%\libcurl.lib" (
+        set "CURL_LINK_FLAGS=-extra-linker-flags:"/LIBPATH:%GAMEJOLT_CURL_LIB_DIR% libcurl.lib""
+    )
+) else if exist "odin\vendor\curl\lib\libcurl.lib" (
     set "CURL_LINK_FLAGS=-extra-linker-flags:"/LIBPATH:odin\vendor\curl\lib libcurl.lib""
 ) else if exist "C:\ProgramData\chocolatey\lib\curl\tools\curl-*\lib\libcurl.lib" (
     for /d %%D in ("C:\ProgramData\chocolatey\lib\curl\tools\curl-*") do (
