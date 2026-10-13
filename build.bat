@@ -12,7 +12,12 @@ if not exist "%OUT_DIR%" mkdir "%OUT_DIR%"
 echo Building for Windows...
 
 set "CURL_LINK_FLAGS=-extra-linker-flags:libcurl.lib"
-if exist "odin\vendor\curl\lib\libcurl.lib" (
+if defined GAMEJOLT_CURL_LIB_DIR (
+    if exist "%GAMEJOLT_CURL_LIB_DIR%\libcurl.lib" (
+        set "CURL_LINK_FLAGS=-extra-linker-flags:"/LIBPATH:%GAMEJOLT_CURL_LIB_DIR% libcurl.lib""
+    )
+)
+if not defined GAMEJOLT_CURL_LIB_DIR if exist "odin\vendor\curl\lib\libcurl.lib" (
     set "CURL_LINK_FLAGS=-extra-linker-flags:"/LIBPATH:odin\vendor\curl\lib libcurl.lib""
 ) else if exist "deps\curl\lib\libcurl.lib" (
     set "CURL_LINK_FLAGS=-extra-linker-flags:"/LIBPATH:deps\curl\lib libcurl.lib""
