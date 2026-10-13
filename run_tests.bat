@@ -5,11 +5,10 @@ echo ============================================================
 echo   1. Running Odin Unit Tests
 echo ============================================================
 
-:: Default fallback linker flag
 set "CURL_LINK_FLAGS=-extra-linker-flags:libcurl.lib"
-
-:: Check common libcurl locations on Windows runners and local dev machines
-if exist "C:\ProgramData\chocolatey\lib\curl\tools\curl-*\lib\libcurl.lib" (
+if exist "odin\vendor\curl\lib\libcurl.lib" (
+    set "CURL_LINK_FLAGS=-extra-linker-flags:"/LIBPATH:odin\vendor\curl\lib libcurl.lib""
+) else if exist "C:\ProgramData\chocolatey\lib\curl\tools\curl-*\lib\libcurl.lib" (
     for /d %%D in ("C:\ProgramData\chocolatey\lib\curl\tools\curl-*") do (
         set "CURL_LINK_FLAGS=-extra-linker-flags:"/LIBPATH:%%D\lib libcurl.lib""
     )
