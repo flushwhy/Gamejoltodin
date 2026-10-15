@@ -82,7 +82,7 @@ _session_sync_to_c :: proc(c: ^GJ_Session_C, native: ^GJ_Session) {
 
 // -----------------------------------------------------------------------
 //  Helpers — copy Odin strings into fixed C buffers safely.
-//  Returns false if src was too long and was silently truncated.
+//  Returns false when src does not fit and is truncated; callers must check it.
 // -----------------------------------------------------------------------
 
 @(private)
@@ -148,7 +148,14 @@ _score_table_to_c :: proc(t: GJ_Score_Table) -> GJ_Score_Table_C {
 @(export)
 gj_init_c :: proc "c" (game_id: cstring, private_key: cstring) -> GJ_Session_C {
     context = runtime.default_context()
-    native := gj_init(string(game_id), string(private_key))
+    // The C session stores credentials in 64-byte fields, including the NUL.
+    // Reject null or oversized inputs instead of silently truncating them.
+    if game_id == nil || private_key == nil do return {}
+    game_id_str := string(game_id)
+    private_key_str := string(private_key)
+    if len(game_id_str) >= 64 || len(private_key_str) >= 64 do return {}
+
+    native := gj_init(game_id_str, private_key_str)
     c: GJ_Session_C
     _session_sync_to_c(&c, &native)
     return c
@@ -174,9 +181,14 @@ gj_login_c :: proc "c" (
 ) -> i32 {
     context = runtime.default_context()
     if session == nil do return i32(GJ_Error.Missing_Config)
+    // username/token are cached in the C session's 64-byte fields.
+    if username == nil || token == nil do return i32(GJ_Error.Bad_Credentials)
+    username_str := string(username)
+    token_str := string(token)
+    if len(username_str) >= 64 || len(token_str) >= 64 do return i32(GJ_Error.Bad_Credentials)
     native := _session_from_c(session^)
     defer _session_sync_to_c(session, &native)
-    user, err := gj_login(&native, string(username), string(token))
+    user, err := gj_login(&native, username_str, token_str)
     if err != .None do return i32(err)
     if out_user != nil do out_user^ = _user_to_c(user)
     return 0
