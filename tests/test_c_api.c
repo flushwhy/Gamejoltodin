@@ -55,6 +55,32 @@ void test_session_lifecycle(void) {
     PASS();
 }
 
+void test_oversized_credentials_rejected(void) {
+    TEST("C ABI rejects credentials that exceed fixed session buffers");
+
+    char long_value[65];
+    memset(long_value, 'x', sizeof(long_value) - 1);
+    long_value[sizeof(long_value) - 1] = '\0';
+
+    GJ_Session invalid_init = gj_init_c(long_value, "key");
+    assert(invalid_init.game_id[0] == '\0');
+    assert(invalid_init.private_key[0] == '\0');
+
+    GJ_Session session = gj_init_c("game", "key");
+    assert(gj_login_c(&session, long_value, "token", NULL) == 4);
+    assert(gj_login_c(&session, "username", long_value, NULL) == 4);
+    assert(gj_login_c(&session, NULL, "token", NULL) == 4);
+    assert(session.username[0] == '\0');
+    assert(session.token[0] == '\0');
+
+    GJ_Session null_init = gj_init_c(NULL, "key");
+    assert(null_init.game_id[0] == '\0');
+    assert(null_init.private_key[0] == '\0');
+
+    gj_destroy_c(&session);
+    PASS();
+}
+
 void test_unauthenticated_guards(void) {
     TEST("Unauthenticated guards return code 6");
 
@@ -122,7 +148,7 @@ void test_score_formatting(void) {
 
     // Buffer capacity safety (truncation with null termination)
     char tiny[4];
-    assert(gj_score_format_c(12345, tiny, sizeof(tiny)) == 0);
+    assert(gj_score_format_c(12345, tiny, sizeof(tiny)) == 10); // Buffer_Too_Small
     assert(tiny[3] == '\0');
 
     PASS();
@@ -133,6 +159,7 @@ int main(void) {
 
     test_struct_sizes();
     test_session_lifecycle();
+    test_oversized_credentials_rejected();
     test_unauthenticated_guards();
     test_score_formatting();
 

@@ -1,6 +1,32 @@
-# Odin GameJolt Wrapper
+# Game Jolt API for Odin and C
 
-An Odin wrapper for the GameJolt API v1.2, exposing a flat C ABI/header interface. This library is designed to be easily integrated into game engines and frameworks supporting C bindings (e.g., Godot, Raylib, Love2D, etc.).
+An **Odin-first** client for the Game Jolt API v1.2, with a small C ABI for C projects and engines. The Game Jolt implementation lives in Odin; the C interface translates inputs and outputs and delegates to that same implementation.
+
+The project has two supported audiences:
+
+- **Odin developers** get a native API using Odin strings, types, allocators, slices, and error returns.
+- **C developers** get a stable, documented C header with explicit-width types, predictable struct layouts, caller-owned output buffers, and error codes.
+
+The C ABI is an adapter—not a second implementation and not a wrapper around a separate C Game Jolt library. C-compatible layouts and fixed buffers belong at the ABI boundary, not in the native Odin API.
+
+## Architecture
+
+```text
+Odin application ──> Native Odin API ──> Game Jolt HTTP / signing / JSON
+C application    ──> C ABI adapter   ──> same Odin implementation
+```
+
+The design goal is to make the C boundary small and auditable. The adapter should validate pointers, capacities, and scalar inputs; convert C strings and structs; call the native implementation; and translate results back to C-compatible values. It should never duplicate endpoint behavior.
+
+A static ABI helps keep the interface predictable, but it does not by itself prevent memory bugs. The implementation must still define ownership and lifetimes clearly, and the adapter must avoid exposing Odin-managed memory to C callers without an explicit contract.
+
+## Project goals
+
+1. Keep the native Odin API idiomatic and independent of C layout constraints.
+2. Keep HTTP requests, authentication, signing, parsing, and endpoint logic in Odin.
+3. Keep fixed-size buffers and C-compatible structs in the C adapter.
+4. Test the Odin API and C ABI independently, including invalid inputs and output-capacity handling.
+5. Provide a complete Odin example game using leaderboards, scores, trophies, and player data. [DapperO](https://github.com/flushwhy/DapperO) is the intended example project.
 
 ## Project Structure
 
@@ -9,24 +35,25 @@ An Odin wrapper for the GameJolt API v1.2, exposing a flat C ABI/header interfac
   - `c_api.odin` - C ABI wrapper exports and structure translations.
   - `types.odin` - Data types and C-compatible structures.
   - `utils.odin` - High-level gameplay utilities (user avatars, pictures, trophy checks, score formatting, data increments).
-  - `utils.odin` - High-level gameplay utilities (user avatars, pictures, trophy checks, score formatting, data increments).
   - `internal.odin` - Request signing, libcurl integration, and parsing utilities.
 - `gamejolt.h` - Flat C ABI header file for engine integration.
 - `build.bat` - Compilation script for Windows (produces `bin/gamejolt.dll`).
 - `build.sh` - Compilation script for Linux & macOS (produces `bin/libgamejolt.so` / `bin/libgamejolt.dylib`).
 
-## Design & C ABI Guidelines
+## Session Ownership
 
-To ensure perfect ABI compatibility and safety:
-1. **Opaque/Flat Sessions:** `GJ_Session` is defined as a flat struct with fixed character buffers (`[64]u8` arrays) instead of Odin strings. No dynamic allocations occur during initialization or session destruction.
-2. **Boolean Alignment:** All boolean fields and flags use `b8` (8-bit boolean) to match the 1-byte size of C's standard `bool` in `<stdbool.h>`.
-3. **No Dynamic Pointers:** Strings returned to C are copied into fixed-size byte buffers provided in the structures or caller-supplied output buffers.
-4. **Caller-Provided Buffers:** All array and string queries (`gj_trophies_fetch_c`, `gj_scores_fetch_c`, `gj_data_get_user_picture_c`, etc.) accept an output buffer and capacity, returning total count.
+The native Odin API returns an Odin-owned `GJ_Session`. Initialize it with `gj_init` and call `gj_destroy(&session)` when finished so its cloned credential and authentication strings are released. The C API instead uses the fixed-layout `GJ_Session` declared in `gamejolt.h`; its buffers are part of the ABI and must not be confused with the native Odin type.
 
-3. **No Dynamic Pointers:** Strings returned to C are copied into fixed-size byte buffers provided in the structures or caller-supplied output buffers.
-4. **Caller-Provided Buffers:** All array and string queries (`gj_trophies_fetch_c`, `gj_scores_fetch_c`, `gj_data_get_user_picture_c`, etc.) accept an output buffer and capacity, returning total count.
+## C ABI Guidelines
 
-All core logic is written in Odin, leveraging its safety and performance; only the thin C‑ABI layer converts data to plain C types for external consumption.
+These rules apply to the C adapter and public C header—not to the native Odin API:
+
+1. **C-compatible representations:** Export only C-compatible scalar types, structs, and pointers. Keep Odin strings, slices, maps, and dynamic arrays internal.
+2. **Explicit ownership:** Any output buffer supplied by C remains caller-owned. Do not return pointers to temporary or Odin-managed memory unless an explicit allocation/free contract is part of the API.
+3. **Validate the boundary:** Check required pointers, non-negative capacities, and valid enum/range values before dereferencing or converting them. Never assume a non-null pointer is valid memory.
+4. **No silent truncation:** String-to-buffer conversion must report truncation or return an appropriate error; do not silently turn a successful API call into incomplete data.
+5. **Stable ABI:** Use explicit-width integer types in the C header and test struct sizes/layouts on supported targets. Treat changes to exported signatures and struct layouts as compatibility changes.
+6. **One implementation:** Exported C functions delegate to native Odin procedures; endpoint logic must not be reimplemented in the adapter.
 
 
 ---
@@ -133,28 +160,11 @@ int main() {
     int32_t err = gj_login_c(&session, "username", "token", &user);
     if (err == 0) {
         printf("Logged in user: %s (ID: %d)\n", user.username, user.id);
-        printf("Logged in user: %s (ID: %d)\n", user.username, user.id);
         
         // Open session
         gj_session_open_c(&session);
         gj_session_ping_c(&session, true);
         
-        // Get user picture (data-store or avatar URL fallback)
-        char pic_url[256] = {0};
-        gj_data_get_user_picture_c(&session, pic_url, sizeof(pic_url));
-        printf("User Picture: %s\n", pic_url);
-
-        // Check a trophy
-        bool unlocked = false;
-        gj_has_trophy_c(&session, 12345, &unlocked);
-        printf("Trophy 12345 unlocked: %s\n", unlocked ? "yes" : "no");
-
-        // Format a score
-        char formatted_score[64] = {0};
-        gj_score_format_c(5000000, formatted_score, sizeof(formatted_score));
-        printf("Formatted score: %s\n", formatted_score);
-        
-        // Close session
         // Get user picture (data-store or avatar URL fallback)
         char pic_url[256] = {0};
         gj_data_get_user_picture_c(&session, pic_url, sizeof(pic_url));
@@ -177,7 +187,6 @@ int main() {
     }
     
     // 3. Destroy session
-    // 3. Destroy session
     gj_destroy_c(&session);
     return 0;
 }
@@ -198,20 +207,8 @@ main :: proc() {
     
     user, err := gamejolt.gj_login(&session, "username", "token")
     if err == .None {
-        fmt.printf("Logged in user: %s (ID: %d)\n", user.username, user.id)
-        
-        // Utility: Fetch picture or avatar fallback
-        pic, _ := gamejolt.gj_data_get_user_picture(&session)
-        defer delete(pic)
-        fmt.printf("User picture: %s\n", pic)
+        defer gamejolt.gj_user_delete(&user)
 
-        // Utility: Check if a trophy has been earned
-        has_it, _ := gamejolt.gj_has_trophy(&session, 12345)
-        fmt.printf("Trophy 12345 unlocked: %v\n", has_it)
-
-        // Utility: Increment a death counter in data-store
-        deaths, _ := gamejolt.gj_data_increment(&session, "deaths", 1, user = true)
-        fmt.printf("Current deaths: %d\n", deaths)
         fmt.printf("Logged in user: %s (ID: %d)\n", user.username, user.id)
         
         // Utility: Fetch picture or avatar fallback

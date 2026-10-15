@@ -80,9 +80,8 @@ test_signature_generation :: proc(t: ^testing.T) {
 
 @(test)
 test_url_builder :: proc(t: ^testing.T) {
-    session: GJ_Session
-    _copy_to_buf(session.game_id[:], "99999")
-    _copy_to_buf(session.private_key[:], "mock_private_key")
+    session := gj_init("99999", "mock_private_key")
+    defer gj_destroy(&session)
 
     params := map[string]string{
         "zebra" = "last",
@@ -161,19 +160,19 @@ test_json_helpers :: proc(t: ^testing.T) {
 @(test)
 test_session_lifecycle :: proc(t: ^testing.T) {
     session := gj_init("game123", "key456")
-    testing.expect_value(t, _buf_to_str(session.game_id[:]), "game123")
-    testing.expect_value(t, _buf_to_str(session.private_key[:]), "key456")
+    testing.expect_value(t, session.game_id, "game123")
+    testing.expect_value(t, session.private_key, "key456")
     testing.expect_value(t, gj_is_logged_in(&session), false)
     testing.expect_value(t, gj_session_username(&session), "")
 
     // Simulate authenticated state
-    _copy_to_buf(session.username[:], "GamerX")
+    session.username = strings.clone("GamerX")
     session.is_authed = true
     testing.expect_value(t, gj_is_logged_in(&session), true)
     testing.expect_value(t, gj_session_username(&session), "GamerX")
 
     gj_destroy(&session)
-    testing.expect_value(t, session.game_id[0], 0)
+    testing.expect_value(t, session.game_id, "")
     testing.expect_value(t, session.is_authed, false)
     testing.expect_value(t, gj_is_logged_in(&session), false)
 }
@@ -212,7 +211,8 @@ test_trophy_helpers :: proc(t: ^testing.T) {
 @(test)
 test_scores_personal_best :: proc(t: ^testing.T) {
     session := gj_init("game", "key")
-    _copy_to_buf(session.username[:], "PlayerOne")
+    defer gj_destroy(&session)
+    session.username = strings.clone("PlayerOne")
     session.is_authed = true
 
     scores := []GJ_Score{
