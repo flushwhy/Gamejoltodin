@@ -21,7 +21,7 @@ GJ_Error :: enum {
 //  Session — caller owned, no global state
 // -----------------------------------------------------------------------
 
-GJ_Session :: struct {
+GJ_Session_C :: struct {
     // Config — set at init, never changed
     game_id:     [64]u8,
     private_key: [64]u8,
@@ -40,6 +40,22 @@ GJ_Session :: struct {
     _scores_submit_in_flight: b8,
     _data_in_flight:         b8,
     _user_data_in_flight:    b8,
+}
+
+// Native session: Odin strings and booleans; independent of the C ABI layout.
+GJ_Session :: struct {
+    game_id: string,
+    private_key: string,
+    username: string,
+    token: string,
+    is_authed: bool,
+    _login_in_flight: bool,
+    _session_open_in_flight: bool,
+    _trophies_in_flight: bool,
+    _scores_in_flight: bool,
+    _scores_submit_in_flight: bool,
+    _data_in_flight: bool,
+    _user_data_in_flight: bool,
 }
 
 // -----------------------------------------------------------------------
