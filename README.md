@@ -35,11 +35,14 @@ A static ABI helps keep the interface predictable, but it does not by itself pre
   - `c_api.odin` - C ABI wrapper exports and structure translations.
   - `types.odin` - Data types and C-compatible structures.
   - `utils.odin` - High-level gameplay utilities (user avatars, pictures, trophy checks, score formatting, data increments).
-  - `utils.odin` - High-level gameplay utilities (user avatars, pictures, trophy checks, score formatting, data increments).
   - `internal.odin` - Request signing, libcurl integration, and parsing utilities.
 - `gamejolt.h` - Flat C ABI header file for engine integration.
 - `build.bat` - Compilation script for Windows (produces `bin/gamejolt.dll`).
 - `build.sh` - Compilation script for Linux & macOS (produces `bin/libgamejolt.so` / `bin/libgamejolt.dylib`).
+
+## Session Ownership
+
+The native Odin API returns an Odin-owned `GJ_Session`. Initialize it with `gj_init` and call `gj_destroy(&session)` when finished so its cloned credential and authentication strings are released. The C API instead uses the fixed-layout `GJ_Session` declared in `gamejolt.h`; its buffers are part of the ABI and must not be confused with the native Odin type.
 
 ## C ABI Guidelines
 
@@ -200,7 +203,6 @@ int main() {
         printf("Login failed with error code: %d\n", err);
     }
     
-    // 3. Destroy session
     // 3. Destroy session
     gj_destroy_c(&session);
     return 0;
