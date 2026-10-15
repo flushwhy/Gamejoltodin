@@ -10,24 +10,20 @@ import "core:thread"
 //  Session Lifecycle
 // -----------------------------------------------------------------------
 
-// Creates and returns a new session. The caller owns this and should
-// call gj_destroy when done. No allocations happen inside the library
-// beyond what you explicitly trigger via API calls.
-gj_init :: proc(
-    game_id:     string,
-    private_key: string,
-) -> GJ_Session {
-    s: GJ_Session
-    ok1 := _copy_to_buf(s.game_id[:],     game_id)
-    ok2 := _copy_to_buf(s.private_key[:], private_key)
-    when ODIN_DEBUG {
-        assert(ok1, "gj_init: game_id exceeds 63-character buffer — it will be truncated and auth will fail")
-        assert(ok2, "gj_init: private_key exceeds 63-character buffer — it will be truncated and auth will fail")
+// Creates a native Odin session. Credentials are cloned into Odin-owned
+// strings; the caller must call gj_destroy when the session is no longer needed.
+gj_init :: proc(game_id: string, private_key: string) -> GJ_Session {
+    return GJ_Session{
+        game_id = strings.clone(game_id),
+        private_key = strings.clone(private_key),
     }
-    return s
 }
 
 gj_destroy :: proc(session: ^GJ_Session) {
+    delete(session.game_id)
+    delete(session.private_key)
+    delete(session.username)
+    delete(session.token)
     session^ = {}
 }
 
@@ -77,8 +73,10 @@ gj_login :: proc(
     user = _parse_user(user_obj, allocator)
 
     // Cache credentials in session
-    _copy_to_buf(session.username[:], username)
-    _copy_to_buf(session.token[:], token)
+    delete(session.username)
+    session.username = strings.clone(username)
+    delete(session.token)
+    session.token = strings.clone(token)
     session.is_authed = true
 
     return user, .None
@@ -127,8 +125,8 @@ gj_session_open :: proc(session: ^GJ_Session) -> GJ_Error {
     defer session._session_open_in_flight = false
 
     params := map[string]string{
-        "username"   = _buf_to_str(session.username[:]),
-        "user_token" = _buf_to_str(session.token[:]),
+        "username"   = session.username,
+        "user_token" = session.token,
     }
     defer delete(params)
 
@@ -140,8 +138,8 @@ gj_session_close :: proc(session: ^GJ_Session) -> GJ_Error {
     if !session.is_authed do return .Not_Authenticated
 
     params := map[string]string{
-        "username"   = _buf_to_str(session.username[:]),
-        "user_token" = _buf_to_str(session.token[:]),
+        "username"   = session.username,
+        "user_token" = session.token,
     }
     defer delete(params)
 
@@ -154,8 +152,8 @@ gj_session_ping :: proc(session: ^GJ_Session, active: bool = true) -> GJ_Error {
     if !session.is_authed do return .Not_Authenticated
 
     params := map[string]string{
-        "username"   = _buf_to_str(session.username[:]),
-        "user_token" = _buf_to_str(session.token[:]),
+        "username"   = session.username,
+        "user_token" = session.token,
         "status"     = active ? "active" : "idle",
     }
     defer delete(params)
@@ -179,8 +177,8 @@ gj_trophies_fetch :: proc(
     defer session._trophies_in_flight = false
 
     params := map[string]string{
-        "username"   = _buf_to_str(session.username[:]),
-        "user_token" = _buf_to_str(session.token[:]),
+        "username"   = session.username,
+        "user_token" = session.token,
         "achieved"   = achieved_only ? "true" : "false",
     }
     defer delete(params)
@@ -209,8 +207,8 @@ gj_trophy_unlock :: proc(session: ^GJ_Session, trophy_id: int) -> GJ_Error {
     if !session.is_authed do return .Not_Authenticated
 
     params := map[string]string{
-        "username"   = _buf_to_str(session.username[:]),
-        "user_token" = _buf_to_str(session.token[:]),
+        "username"   = session.username,
+        "user_token" = session.token,
         "trophy_id"  = _int_to_str(trophy_id),
     }
     defer delete(params)
@@ -238,8 +236,8 @@ gj_scores_fetch :: proc(
     if table_id != 0 do params["table_id"] = _int_to_str(table_id)
     if limit    >  0 do params["limit"]    = _int_to_str(limit)
     if user_only && session.is_authed {
-        params["username"]   = _buf_to_str(session.username[:])
-        params["user_token"] = _buf_to_str(session.token[:])
+        params["username"]   = session.username
+        params["user_token"] = session.token
     }
 
     response, req_err := _gj_request(session, "/scores", params, context.temp_allocator)
@@ -297,8 +295,8 @@ gj_scores_submit :: proc(
     defer session._scores_submit_in_flight = false
 
     params := make(map[string]string, 8, context.temp_allocator)
-    params["username"]   = _buf_to_str(session.username[:])
-    params["user_token"] = _buf_to_str(session.token[:])
+    params["username"]   = session.username
+    params["user_token"] = session.token
     params["score"]      = score_str
     params["sort"]       = _int_to_str(sort)
     if table_id != 0 do params["table_id"]  = _int_to_str(table_id)
@@ -363,8 +361,8 @@ gj_data_set :: proc(
     params["key"]  = key
     params["data"] = data
     if user {
-        params["username"]   = _buf_to_str(session.username[:])
-        params["user_token"] = _buf_to_str(session.token[:])
+        params["username"]   = session.username
+        params["user_token"] = session.token
     }
 
     _, err := _gj_request(session, "/data-store/set", params)
@@ -382,8 +380,8 @@ gj_data_get :: proc(
     params := make(map[string]string, 4, context.temp_allocator)
     params["key"] = key
     if user {
-        params["username"]   = _buf_to_str(session.username[:])
-        params["user_token"] = _buf_to_str(session.token[:])
+        params["username"]   = session.username
+        params["user_token"] = session.token
     }
 
     response, req_err := _gj_request(session, "/data-store", params, context.temp_allocator)
@@ -403,8 +401,8 @@ gj_data_remove :: proc(
     params := make(map[string]string, 4, context.temp_allocator)
     params["key"] = key
     if user {
-        params["username"]   = _buf_to_str(session.username[:])
-        params["user_token"] = _buf_to_str(session.token[:])
+        params["username"]   = session.username
+        params["user_token"] = session.token
     }
 
     _, err := _gj_request(session, "/data-store/remove", params)
@@ -420,8 +418,8 @@ gj_data_keys :: proc(
 
     params := make(map[string]string, 4, context.temp_allocator)
     if user {
-        params["username"]   = _buf_to_str(session.username[:])
-        params["user_token"] = _buf_to_str(session.token[:])
+        params["username"]   = session.username
+        params["user_token"] = session.token
     }
 
     response, req_err := _gj_request(session, "/data-store/get-keys", params, context.temp_allocator)
