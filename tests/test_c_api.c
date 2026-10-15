@@ -148,7 +148,7 @@ void test_score_formatting(void) {
 
     // Buffer capacity safety (truncation with null termination)
     char tiny[4];
-    assert(gj_score_format_c(12345, tiny, sizeof(tiny)) == 0);
+    assert(gj_score_format_c(12345, tiny, sizeof(tiny)) == 10); // Buffer_Too_Small
     assert(tiny[3] == '\0');
 
     PASS();
