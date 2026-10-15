@@ -160,28 +160,11 @@ int main() {
     int32_t err = gj_login_c(&session, "username", "token", &user);
     if (err == 0) {
         printf("Logged in user: %s (ID: %d)\n", user.username, user.id);
-        printf("Logged in user: %s (ID: %d)\n", user.username, user.id);
         
         // Open session
         gj_session_open_c(&session);
         gj_session_ping_c(&session, true);
         
-        // Get user picture (data-store or avatar URL fallback)
-        char pic_url[256] = {0};
-        gj_data_get_user_picture_c(&session, pic_url, sizeof(pic_url));
-        printf("User Picture: %s\n", pic_url);
-
-        // Check a trophy
-        bool unlocked = false;
-        gj_has_trophy_c(&session, 12345, &unlocked);
-        printf("Trophy 12345 unlocked: %s\n", unlocked ? "yes" : "no");
-
-        // Format a score
-        char formatted_score[64] = {0};
-        gj_score_format_c(5000000, formatted_score, sizeof(formatted_score));
-        printf("Formatted score: %s\n", formatted_score);
-        
-        // Close session
         // Get user picture (data-store or avatar URL fallback)
         char pic_url[256] = {0};
         gj_data_get_user_picture_c(&session, pic_url, sizeof(pic_url));
@@ -224,20 +207,7 @@ main :: proc() {
     
     user, err := gamejolt.gj_login(&session, "username", "token")
     if err == .None {
-        fmt.printf("Logged in user: %s (ID: %d)\n", user.username, user.id)
-        
-        // Utility: Fetch picture or avatar fallback
-        pic, _ := gamejolt.gj_data_get_user_picture(&session)
-        defer delete(pic)
-        fmt.printf("User picture: %s\n", pic)
 
-        // Utility: Check if a trophy has been earned
-        has_it, _ := gamejolt.gj_has_trophy(&session, 12345)
-        fmt.printf("Trophy 12345 unlocked: %v\n", has_it)
-
-        // Utility: Increment a death counter in data-store
-        deaths, _ := gamejolt.gj_data_increment(&session, "deaths", 1, user = true)
-        fmt.printf("Current deaths: %d\n", deaths)
         fmt.printf("Logged in user: %s (ID: %d)\n", user.username, user.id)
         
         // Utility: Fetch picture or avatar fallback
