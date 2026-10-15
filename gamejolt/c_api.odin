@@ -190,6 +190,14 @@ gj_login_c :: proc "c" (
     defer _session_sync_to_c(session, &native)
     user, err := gj_login(&native, username_str, token_str)
     if err != .None do return i32(err)
+    // The native API returns caller-owned strings; the C result is a copy.
+    defer {
+        delete(user.username)
+        delete(user.avatar_url)
+        delete(user.status)
+        delete(user.signed_up)
+        delete(user.last_logged_in)
+    }
     if out_user != nil {
         c_user, ok := _user_to_c(user)
         if !ok do return i32(GJ_Error.Buffer_Too_Small)
