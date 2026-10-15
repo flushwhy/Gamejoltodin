@@ -207,6 +207,7 @@ main :: proc() {
     
     user, err := gamejolt.gj_login(&session, "username", "token")
     if err == .None {
+        defer gamejolt.gj_user_delete(&user)
 
         fmt.printf("Logged in user: %s (ID: %d)\n", user.username, user.id)
         
