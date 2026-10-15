@@ -10,9 +10,8 @@ import "core:thread"
 //  Session Lifecycle
 // -----------------------------------------------------------------------
 
-// Creates and returns a new session. The caller owns this and should
-// call gj_destroy when done. No allocations happen inside the library
-// beyond what you explicitly trigger via API calls.
+// Creates a native Odin session. Credentials are cloned into Odin-owned
+// strings; the caller must call gj_destroy when the session is no longer needed.
 gj_init :: proc(game_id: string, private_key: string) -> GJ_Session {
     return GJ_Session{
         game_id = strings.clone(game_id),
