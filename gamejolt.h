@@ -13,11 +13,17 @@
  *   6  = not_authenticated  (call gj_login_c first)
  *   7  = missing_config     (game_id or private_key empty / truncated)
  *   8  = rate_limited
+ *   9  = unknown
+ *  10  = buffer_too_small (output was not fully copied)
  *
  * Array-returning functions use a caller-provided buffer pattern:
  *   - Pass out_buf=NULL / capacity=0 to query the total count only.
  *   - Pass a buffer + capacity to fill up to `capacity` entries.
  *   - out_count always receives the TOTAL number available (not capped).
+ *
+ * gj_init_c returns a zeroed session when credentials are null or too long
+ * for their 64-byte fields (maximum 63 characters plus NUL).
+ * gj_login_c returns bad_credentials for null or oversized username/token.
  *
  * Runtime dependency: libcurl.dll must be on PATH or next to gamejolt.dll.
  */
