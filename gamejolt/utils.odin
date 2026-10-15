@@ -23,14 +23,14 @@ import "core:thread"
 // Returns true if the session has been initialised AND the user has
 // successfully logged in. Safe to call at any point.
 gj_is_logged_in :: proc(session: ^GJ_Session) -> bool {
-    return session != nil && bool(session.is_authed)
+    return session != nil && session.is_authed
 }
 
 // Returns the cached username string from the session (no network call).
 // Returns "" if not yet authenticated.
 gj_session_username :: proc(session: ^GJ_Session) -> string {
     if !gj_is_logged_in(session) do return ""
-    return _buf_to_str(session.username[:])
+    return session.username
 }
 
 // -----------------------------------------------------------------------
@@ -46,7 +46,7 @@ gj_get_current_user :: proc(
     if !gj_is_logged_in(session) do return {}, .Not_Authenticated
 
     params := map[string]string{
-        "username" = _buf_to_str(session.username[:]),
+        "username" = session.username,
     }
     defer delete(params)
 
@@ -293,13 +293,13 @@ gj_scores_get_top :: proc(
 // Returns a single-line human-readable summary of a session for logging.
 gj_session_debug_string :: proc(session: ^GJ_Session) -> string {
     if session == nil do return "<nil session>"
-    game_id := _buf_to_str(session.game_id[:])
+    game_id := session.game_id
     if !bool(session.is_authed) {
         return fmt.tprintf("[GJ_Session game=%s NOT_AUTHED]", game_id)
     }
     return fmt.tprintf("[GJ_Session game=%s user=%s]",
         game_id,
-        _buf_to_str(session.username[:]),
+        session.username,
     )
 }
 
