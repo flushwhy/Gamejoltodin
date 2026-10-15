@@ -99,46 +99,46 @@ _copy_to_buf :: proc(dst: []u8, src: string) -> bool {
 }
 
 @(private)
-_user_to_c :: proc(u: GJ_User) -> GJ_User_C {
+_user_to_c :: proc(u: GJ_User) -> (c: GJ_User_C, ok: bool) {
     c: GJ_User_C
     c.id = i32(u.id)
-    _copy_to_buf(c.username[:],   u.username)
-    _copy_to_buf(c.avatar_url[:], u.avatar_url)
-    _copy_to_buf(c.status[:],     u.status)
-    return c
+    ok = _copy_to_buf(c.username[:], u.username)
+    ok = _copy_to_buf(c.avatar_url[:], u.avatar_url) && ok
+    ok = _copy_to_buf(c.status[:], u.status) && ok
+    return c, ok
 }
 
 @(private)
-_trophy_to_c :: proc(t: GJ_Trophy) -> GJ_Trophy_C {
+_trophy_to_c :: proc(t: GJ_Trophy) -> (c: GJ_Trophy_C, ok: bool) {
     c: GJ_Trophy_C
     c.id         = i32(t.id)
     c.achieved   = b8(t.achieved)
     c.difficulty = i32(t.difficulty)
-    _copy_to_buf(c.title[:],       t.title)
-    _copy_to_buf(c.description[:], t.description)
-    _copy_to_buf(c.image_url[:],   t.image_url)
-    return c
+    ok = _copy_to_buf(c.title[:], t.title)
+    ok = _copy_to_buf(c.description[:], t.description) && ok
+    ok = _copy_to_buf(c.image_url[:], t.image_url) && ok
+    return c, ok
 }
 
 @(private)
-_score_to_c :: proc(s: GJ_Score) -> GJ_Score_C {
+_score_to_c :: proc(s: GJ_Score) -> (c: GJ_Score_C, ok: bool) {
     c: GJ_Score_C
     c.sort = i32(s.sort)
-    _copy_to_buf(c.score[:],      s.score)
-    _copy_to_buf(c.user[:],       s.user)
-    _copy_to_buf(c.guest[:],      s.guest)
-    _copy_to_buf(c.extra_data[:], s.extra_data)
-    return c
+    ok = _copy_to_buf(c.score[:], s.score)
+    ok = _copy_to_buf(c.user[:], s.user) && ok
+    ok = _copy_to_buf(c.guest[:], s.guest) && ok
+    ok = _copy_to_buf(c.extra_data[:], s.extra_data) && ok
+    return c, ok
 }
 
 @(private)
-_score_table_to_c :: proc(t: GJ_Score_Table) -> GJ_Score_Table_C {
+_score_table_to_c :: proc(t: GJ_Score_Table) -> (c: GJ_Score_Table_C, ok: bool) {
     c: GJ_Score_Table_C
     c.id      = i32(t.id)
     c.primary = b8(t.primary)
-    _copy_to_buf(c.name[:],        t.name)
-    _copy_to_buf(c.description[:], t.description)
-    return c
+    ok = _copy_to_buf(c.name[:], t.name)
+    ok = _copy_to_buf(c.description[:], t.description) && ok
+    return c, ok
 }
 
 // -----------------------------------------------------------------------
@@ -190,7 +190,11 @@ gj_login_c :: proc "c" (
     defer _session_sync_to_c(session, &native)
     user, err := gj_login(&native, username_str, token_str)
     if err != .None do return i32(err)
-    if out_user != nil do out_user^ = _user_to_c(user)
+    if out_user != nil {
+        c_user, ok := _user_to_c(user)
+        if !ok do return i32(GJ_Error.Buffer_Too_Small)
+        out_user^ = c_user
+    }
     return 0
 }
 
@@ -254,7 +258,9 @@ gj_trophies_fetch_c :: proc "c" (
     if out_buf != nil {
         count := min(len(trophies), int(capacity))
         for i in 0..<count {
-            out_buf[i] = _trophy_to_c(trophies[i])
+            c_trophy, ok := _trophy_to_c(trophies[i])
+            if !ok do return i32(GJ_Error.Buffer_Too_Small)
+            out_buf[i] = c_trophy
         }
     }
     return 0
@@ -295,7 +301,9 @@ gj_scores_fetch_c :: proc "c" (
     if out_buf != nil {
         count := min(len(scores), int(capacity))
         for i in 0..<count {
-            out_buf[i] = _score_to_c(scores[i])
+            c_score, ok := _score_to_c(scores[i])
+            if !ok do return i32(GJ_Error.Buffer_Too_Small)
+            out_buf[i] = c_score
         }
     }
     return 0
@@ -320,7 +328,9 @@ gj_scores_tables_c :: proc "c" (
     if out_buf != nil {
         count := min(len(tables), int(capacity))
         for i in 0..<count {
-            out_buf[i] = _score_table_to_c(tables[i])
+            c_table, ok := _score_table_to_c(tables[i])
+            if !ok do return i32(GJ_Error.Buffer_Too_Small)
+            out_buf[i] = c_table
         }
     }
     return 0
@@ -421,7 +431,7 @@ gj_data_get_c :: proc "c" (
     if err != .None do return i32(err)
     defer delete(data)
     if out_buf != nil && capacity > 0 {
-        _copy_to_buf(out_buf[:capacity], data)
+        if !_copy_to_buf(out_buf[:capacity], data) do return i32(GJ_Error.Buffer_Too_Small)
     }
     return 0
 }
@@ -447,7 +457,7 @@ gj_data_keys_c :: proc "c" (
     if out_buf != nil {
         count := min(len(keys), int(capacity))
         for i in 0..<count {
-            _copy_to_buf(out_buf[i].key[:], keys[i])
+            if !_copy_to_buf(out_buf[i].key[:], keys[i]) do return i32(GJ_Error.Buffer_Too_Small)
         }
     }
     return 0
@@ -479,7 +489,7 @@ gj_session_username_c :: proc "c" (
     if !gj_is_logged_in(&native) do return i32(GJ_Error.Not_Authenticated)
     uname := gj_session_username(&native)
     if out_buf != nil && capacity > 0 {
-        _copy_to_buf(out_buf[:capacity], uname)
+        if !_copy_to_buf(out_buf[:capacity], uname) do return i32(GJ_Error.Buffer_Too_Small)
     }
     return 0
 }
@@ -495,7 +505,11 @@ gj_get_current_user_c :: proc "c" (
     defer _session_sync_to_c(session, &native)
     user, err := gj_get_current_user(&native, context.temp_allocator)
     if err != .None do return i32(err)
-    if out_user != nil do out_user^ = _user_to_c(user)
+    if out_user != nil {
+        c_user, ok := _user_to_c(user)
+        if !ok do return i32(GJ_Error.Buffer_Too_Small)
+        out_user^ = c_user
+    }
     return 0
 }
 
@@ -512,7 +526,7 @@ gj_get_user_avatar_url_c :: proc "c" (
     url, err := gj_get_user_avatar_url(&native, context.temp_allocator)
     if err != .None do return i32(err)
     if out_buf != nil && capacity > 0 {
-        _copy_to_buf(out_buf[:capacity], url)
+        if !_copy_to_buf(out_buf[:capacity], url) do return i32(GJ_Error.Buffer_Too_Small)
     }
     return 0
 }
@@ -530,7 +544,7 @@ gj_data_get_user_picture_c :: proc "c" (
     pic, err := gj_data_get_user_picture(&native, context.temp_allocator)
     if err != .None do return i32(err)
     if out_buf != nil && capacity > 0 {
-        _copy_to_buf(out_buf[:capacity], pic)
+        if !_copy_to_buf(out_buf[:capacity], pic) do return i32(GJ_Error.Buffer_Too_Small)
     }
     return 0
 }
@@ -622,7 +636,7 @@ gj_score_format_c :: proc "c" (
     context = runtime.default_context()
     formatted := gj_score_format(int(sort), context.temp_allocator)
     if out_buf != nil && capacity > 0 {
-        _copy_to_buf(out_buf[:capacity], formatted)
+        if !_copy_to_buf(out_buf[:capacity], formatted) do return i32(GJ_Error.Buffer_Too_Small)
     }
     return 0
 }
