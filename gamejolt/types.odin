@@ -15,6 +15,7 @@ GJ_Error :: enum {
     Missing_Config,       // game_id or private_key is empty
     Rate_Limited,         // Too many requests
     Unknown,
+    Buffer_Too_Small,     // C output buffer cannot hold the complete value
 }
 
 // -----------------------------------------------------------------------
