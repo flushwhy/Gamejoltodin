@@ -47,11 +47,13 @@ GJ_DataKey_C :: struct {
 // Convert the stable C ABI session to a short-lived native session for one call.
 @(private)
 _session_from_c :: proc(c: GJ_Session_C) -> GJ_Session {
+    // Copy the by-value parameter into an addressable local before slicing arrays.
+    c_copy := c
     return GJ_Session{
-        game_id = strings.clone(_buf_to_str(c.game_id[:])),
-        private_key = strings.clone(_buf_to_str(c.private_key[:])),
-        username = strings.clone(_buf_to_str(c.username[:])),
-        token = strings.clone(_buf_to_str(c.token[:])),
+        game_id = strings.clone(_buf_to_str(c_copy.game_id[:])),
+        private_key = strings.clone(_buf_to_str(c_copy.private_key[:])),
+        username = strings.clone(_buf_to_str(c_copy.username[:])),
+        token = strings.clone(_buf_to_str(c_copy.token[:])),
         is_authed = bool(c.is_authed),
         _login_in_flight = bool(c._login_in_flight),
         _session_open_in_flight = bool(c._session_open_in_flight),
@@ -100,7 +102,6 @@ _copy_to_buf :: proc(dst: []u8, src: string) -> bool {
 
 @(private)
 _user_to_c :: proc(u: GJ_User) -> (c: GJ_User_C, ok: bool) {
-    c: GJ_User_C
     c.id = i32(u.id)
     ok = _copy_to_buf(c.username[:], u.username)
     ok = _copy_to_buf(c.avatar_url[:], u.avatar_url) && ok
@@ -110,7 +111,6 @@ _user_to_c :: proc(u: GJ_User) -> (c: GJ_User_C, ok: bool) {
 
 @(private)
 _trophy_to_c :: proc(t: GJ_Trophy) -> (c: GJ_Trophy_C, ok: bool) {
-    c: GJ_Trophy_C
     c.id         = i32(t.id)
     c.achieved   = b8(t.achieved)
     c.difficulty = i32(t.difficulty)
@@ -122,7 +122,6 @@ _trophy_to_c :: proc(t: GJ_Trophy) -> (c: GJ_Trophy_C, ok: bool) {
 
 @(private)
 _score_to_c :: proc(s: GJ_Score) -> (c: GJ_Score_C, ok: bool) {
-    c: GJ_Score_C
     c.sort = i32(s.sort)
     ok = _copy_to_buf(c.score[:], s.score)
     ok = _copy_to_buf(c.user[:], s.user) && ok
@@ -133,7 +132,6 @@ _score_to_c :: proc(s: GJ_Score) -> (c: GJ_Score_C, ok: bool) {
 
 @(private)
 _score_table_to_c :: proc(t: GJ_Score_Table) -> (c: GJ_Score_Table_C, ok: bool) {
-    c: GJ_Score_Table_C
     c.id      = i32(t.id)
     c.primary = b8(t.primary)
     ok = _copy_to_buf(c.name[:], t.name)
@@ -478,7 +476,7 @@ gj_data_keys_c :: proc "c" (
 @(export)
 gj_is_logged_in_c :: proc "c" (session: ^GJ_Session_C) -> b8 {
     context = runtime.default_context()
-    if session == nil do return 0
+    if session == nil do return false
     native := _session_from_c(session^)
     defer _session_sync_to_c(session, &native)
     return b8(gj_is_logged_in(&native))
