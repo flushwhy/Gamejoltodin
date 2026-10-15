@@ -448,7 +448,7 @@ gj_data_keys_c :: proc "c" (
 @(export)
 gj_is_logged_in_c :: proc "c" (session: ^GJ_Session_C) -> b8 {
     context = runtime.default_context()
-    if session == nil do return i32(GJ_Error.Missing_Config)
+    if session == nil do return 0
     native := _session_from_c(session^)
     defer _session_sync_to_c(session, &native)
     return b8(gj_is_logged_in(&native))
