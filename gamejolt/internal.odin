@@ -64,7 +64,7 @@ _gj_build_url :: proc(
     for k, v in params {
         all_params[k] = v
     }
-    all_params["game_id"] = _buf_to_str(session.game_id[:])
+    all_params["game_id"] = session.game_id
     all_params["format"]  = "json"
 
     // Sort keys alphabetically — required for consistent signing
@@ -86,7 +86,7 @@ _gj_build_url :: proc(
     raw_url    := strings.concatenate({BASE_URL, endpoint, "?", raw_params}, context.temp_allocator)
 
     // Sign the raw URL
-    signature := _gj_sign(raw_url, _buf_to_str(session.private_key[:]), context.temp_allocator)
+    signature := _gj_sign(raw_url, session.private_key, context.temp_allocator)
 
     // Build final URL with signature appended
     final_sb := strings.builder_make(allocator)
@@ -211,7 +211,7 @@ _gj_request :: proc(
     params:    map[string]string,
     allocator := context.allocator,
 ) -> (response: json.Object, err: GJ_Error) {
-    if session.game_id[0] == 0 || session.private_key[0] == 0 {
+    if session.game_id == "" || session.private_key == "" {
         return nil, .Missing_Config
     }
 
