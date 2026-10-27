@@ -218,7 +218,10 @@ gj_trophies_unachieved :: proc(trophies: []GJ_Trophy) -> []GJ_Trophy {
     return result
 }
 
-// Fetch trophies async and call callback on the results in a background thread.
+// Fetch trophies async and call callback on the worker thread.
+// The session must remain valid until the callback runs. The callback owns
+// the returned slice and must release it with gj_trophies_delete; marshal
+// results to the main thread itself if its engine requires that.
 gj_trophies_fetch_async :: proc(
     session:       ^GJ_Session,
     achieved_only: bool,
