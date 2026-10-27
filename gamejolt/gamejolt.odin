@@ -82,7 +82,10 @@ gj_login :: proc(
     return user, .None
 }
 
-// Async convenience — Odin layer only, not exported to C ABI
+// Async convenience — Odin layer only, not exported to C ABI.
+// The session must remain valid until the callback runs. The callback runs
+// on a worker thread and owns the returned user's allocated strings; release
+// username, avatar_url, status, signed_up, and last_logged_in with delete().
 gj_login_async :: proc(
     session:  ^GJ_Session,
     username: string,
