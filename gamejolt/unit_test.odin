@@ -106,6 +106,40 @@ test_url_builder :: proc(t: ^testing.T) {
     testing.expect(t, strings.contains(url, "&signature="), "URL must append &signature=")
 }
 
+@(test)
+test_url_encoding :: proc(t: ^testing.T) {
+    testing.expect_value(t, _gj_url_encode("plain-_.~AZ09", context.temp_allocator), "plain-_.~AZ09")
+    testing.expect_value(t, _gj_url_encode("hello world", context.temp_allocator), "hello%20world")
+    testing.expect_value(t, _gj_url_encode("a+b/c&d=e?", context.temp_allocator), "a%2Bb%2Fc%26d%3De%3F")
+    testing.expect_value(t, _gj_url_encode("café", context.temp_allocator), "caf%C3%A9")
+}
+
+@(test)
+test_url_builder_encodes_and_signs_encoded_url :: proc(t: ^testing.T) {
+    session := gj_init("99999", "mock_private_key")
+    defer gj_destroy(&session)
+
+    params := map[string]string{
+        "message" = "hello world&score=1",
+        "reserved" = "a+b/c",
+    }
+    defer delete(params)
+
+    url := _gj_build_url(&session, "/scores", params, context.temp_allocator)
+
+    testing.expect(t, strings.contains(url, "message=hello%20world%26score%3D1"), "URL must encode spaces and reserved characters")
+    testing.expect(t, strings.contains(url, "reserved=a%2Bb%2Fc"), "URL must encode plus and slash")
+
+    signature_marker := "&signature="
+    signature_pos := strings.index(url, signature_marker)
+    testing.expect(t, signature_pos >= 0, "URL must append signature")
+    if signature_pos >= 0 {
+        unsigned_url := url[:signature_pos]
+        signature := url[signature_pos + len(signature_marker):]
+        testing.expect_value(t, signature, _gj_sign(unsigned_url, session.private_key, context.temp_allocator))
+    }
+}
+
 // -----------------------------------------------------------------------
 //  JSON Response Parsing Tests
 // -----------------------------------------------------------------------
