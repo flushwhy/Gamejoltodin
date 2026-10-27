@@ -254,6 +254,7 @@ gj_trophies_fetch_c :: proc "c" (
 ) -> i32 {
     context = runtime.default_context()
     if session == nil do return i32(GJ_Error.Missing_Config)
+    if capacity < 0 || (out_buf == nil && capacity != 0) do return i32(GJ_Error.Unknown)
     native := _session_from_c(session^)
     defer _session_sync_to_c(session, &native)
     trophies, err := gj_trophies_fetch(&native, bool(achieved_only))
@@ -297,6 +298,7 @@ gj_scores_fetch_c :: proc "c" (
 ) -> i32 {
     context = runtime.default_context()
     if session == nil do return i32(GJ_Error.Missing_Config)
+    if capacity < 0 || (out_buf == nil && capacity != 0) do return i32(GJ_Error.Unknown)
     native := _session_from_c(session^)
     defer _session_sync_to_c(session, &native)
     scores, err := gj_scores_fetch(&native, int(table_id), int(limit), bool(user_only))
@@ -324,6 +326,7 @@ gj_scores_tables_c :: proc "c" (
 ) -> i32 {
     context = runtime.default_context()
     if session == nil do return i32(GJ_Error.Missing_Config)
+    if capacity < 0 || (out_buf == nil && capacity != 0) do return i32(GJ_Error.Unknown)
     native := _session_from_c(session^)
     defer _session_sync_to_c(session, &native)
     tables, err := gj_scores_tables(&native)
@@ -431,6 +434,7 @@ gj_data_get_c :: proc "c" (
 ) -> i32 {
     context = runtime.default_context()
     if session == nil do return i32(GJ_Error.Missing_Config)
+    if out_buf == nil || capacity <= 0 do return i32(GJ_Error.Buffer_Too_Small)
     native := _session_from_c(session^)
     defer _session_sync_to_c(session, &native)
     data, err := gj_data_get(&native, string(key), bool(user))
@@ -453,6 +457,7 @@ gj_data_keys_c :: proc "c" (
 ) -> i32 {
     context = runtime.default_context()
     if session == nil do return i32(GJ_Error.Missing_Config)
+    if capacity < 0 || (out_buf == nil && capacity != 0) do return i32(GJ_Error.Unknown)
     native := _session_from_c(session^)
     defer _session_sync_to_c(session, &native)
     keys, err := gj_data_keys(&native, bool(user))
@@ -490,6 +495,7 @@ gj_session_username_c :: proc "c" (
 ) -> i32 {
     context = runtime.default_context()
     if session == nil do return i32(GJ_Error.Missing_Config)
+    if out_buf == nil || capacity <= 0 do return i32(GJ_Error.Buffer_Too_Small)
     native := _session_from_c(session^)
     defer _session_sync_to_c(session, &native)
     if !gj_is_logged_in(&native) do return i32(GJ_Error.Not_Authenticated)
@@ -527,6 +533,7 @@ gj_get_user_avatar_url_c :: proc "c" (
 ) -> i32 {
     context = runtime.default_context()
     if session == nil do return i32(GJ_Error.Missing_Config)
+    if out_buf == nil || capacity <= 0 do return i32(GJ_Error.Buffer_Too_Small)
     native := _session_from_c(session^)
     defer _session_sync_to_c(session, &native)
     url, err := gj_get_user_avatar_url(&native, context.temp_allocator)
@@ -545,6 +552,7 @@ gj_data_get_user_picture_c :: proc "c" (
 ) -> i32 {
     context = runtime.default_context()
     if session == nil do return i32(GJ_Error.Missing_Config)
+    if out_buf == nil || capacity <= 0 do return i32(GJ_Error.Buffer_Too_Small)
     native := _session_from_c(session^)
     defer _session_sync_to_c(session, &native)
     pic, err := gj_data_get_user_picture(&native, context.temp_allocator)
@@ -640,6 +648,7 @@ gj_score_format_c :: proc "c" (
     capacity: i32,
 ) -> i32 {
     context = runtime.default_context()
+    if out_buf == nil || capacity <= 0 do return i32(GJ_Error.Buffer_Too_Small)
     formatted := gj_score_format(int(sort), context.temp_allocator)
     if out_buf != nil && capacity > 0 {
         if !_copy_to_buf(out_buf[:capacity], formatted) do return i32(GJ_Error.Buffer_Too_Small)
