@@ -124,6 +124,9 @@ void test_buffer_argument_validation(void) {
     assert(gj_scores_fetch_c(&session, 0, 10, false, NULL, 1, NULL) == 9);
     assert(gj_scores_tables_c(&session, NULL, -1, NULL) == 9);
     assert(gj_data_keys_c(&session, false, NULL, 1, NULL) == 9);
+    assert(gj_data_get_c(&session, "key", false, NULL, 0) == 10);
+    assert(gj_session_username_c(&session, NULL, 0) == 10);
+    assert(gj_get_user_avatar_url_c(&session, NULL, 0) == 10);
     assert(gj_score_format_c(42, NULL, 0) == 10);
 
     gj_destroy_c(&session);
