@@ -20,6 +20,9 @@
  *   - Pass out_buf=NULL / capacity=0 to query the total count only.
  *   - Pass a buffer + capacity to fill up to `capacity` entries.
  *   - out_count always receives the TOTAL number available (not capped).
+ *   - Negative capacities, or NULL buffers with nonzero capacity, return error 9.
+ * String-output functions require a non-NULL buffer with positive capacity;
+ * missing or insufficient output buffers return error 10 (buffer_too_small).
  *
  * gj_init_c returns a zeroed session when credentials are null or too long
  * for their 64-byte fields (maximum 63 characters plus NUL).
