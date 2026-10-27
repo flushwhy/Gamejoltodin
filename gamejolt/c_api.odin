@@ -355,9 +355,11 @@ gj_scores_submit_c :: proc "c" (
 ) -> i32 {
     context = runtime.default_context()
     if session == nil do return i32(GJ_Error.Missing_Config)
+    if score_str == nil do return i32(GJ_Error.Unknown)
     native := _session_from_c(session^)
     defer _session_sync_to_c(session, &native)
-    return i32(gj_scores_submit(&native, string(score_str), int(sort), int(table_id), string(extra)))
+    extra_str := extra != nil ? string(extra) : ""
+    return i32(gj_scores_submit(&native, string(score_str), int(sort), int(table_id), extra_str))
 }
 
 @(export)
@@ -370,6 +372,7 @@ gj_scores_submit_guest_c :: proc "c" (
 ) -> i32 {
     context = runtime.default_context()
     if session == nil do return i32(GJ_Error.Missing_Config)
+    if guest_name == nil || score_str == nil do return i32(GJ_Error.Unknown)
     native := _session_from_c(session^)
     defer _session_sync_to_c(session, &native)
     return i32(gj_scores_submit_guest(&native, string(guest_name), string(score_str), int(sort), int(table_id)))
@@ -405,6 +408,7 @@ gj_data_set_c :: proc "c" (
 ) -> i32 {
     context = runtime.default_context()
     if session == nil do return i32(GJ_Error.Missing_Config)
+    if key == nil || data == nil do return i32(GJ_Error.Unknown)
     native := _session_from_c(session^)
     defer _session_sync_to_c(session, &native)
     return i32(gj_data_set(&native, string(key), string(data), bool(user)))
@@ -418,6 +422,7 @@ gj_data_remove_c :: proc "c" (
 ) -> i32 {
     context = runtime.default_context()
     if session == nil do return i32(GJ_Error.Missing_Config)
+    if key == nil do return i32(GJ_Error.Unknown)
     native := _session_from_c(session^)
     defer _session_sync_to_c(session, &native)
     return i32(gj_data_remove(&native, string(key), bool(user)))
@@ -434,6 +439,7 @@ gj_data_get_c :: proc "c" (
 ) -> i32 {
     context = runtime.default_context()
     if session == nil do return i32(GJ_Error.Missing_Config)
+    if key == nil do return i32(GJ_Error.Unknown)
     if out_buf == nil || capacity <= 0 do return i32(GJ_Error.Buffer_Too_Small)
     native := _session_from_c(session^)
     defer _session_sync_to_c(session, &native)
@@ -562,6 +568,7 @@ gj_data_set_user_picture_c :: proc "c" (
 ) -> i32 {
     context = runtime.default_context()
     if session == nil do return i32(GJ_Error.Missing_Config)
+    if picture_data == nil do return i32(GJ_Error.Unknown)
     native := _session_from_c(session^)
     defer _session_sync_to_c(session, &native)
     return i32(gj_data_set_user_picture(&native, string(picture_data)))
@@ -577,6 +584,7 @@ gj_data_get_int_c :: proc "c" (
 ) -> i32 {
     context = runtime.default_context()
     if session == nil do return i32(GJ_Error.Missing_Config)
+    if key == nil do return i32(GJ_Error.Unknown)
     native := _session_from_c(session^)
     defer _session_sync_to_c(session, &native)
     val, err := gj_data_get_int(&native, string(key), int(default_val), bool(user))
@@ -594,6 +602,7 @@ gj_data_set_int_c :: proc "c" (
 ) -> i32 {
     context = runtime.default_context()
     if session == nil do return i32(GJ_Error.Missing_Config)
+    if key == nil do return i32(GJ_Error.Unknown)
     native := _session_from_c(session^)
     defer _session_sync_to_c(session, &native)
     return i32(gj_data_set_int(&native, string(key), int(value), bool(user)))
@@ -609,6 +618,7 @@ gj_data_increment_c :: proc "c" (
 ) -> i32 {
     context = runtime.default_context()
     if session == nil do return i32(GJ_Error.Missing_Config)
+    if key == nil do return i32(GJ_Error.Unknown)
     native := _session_from_c(session^)
     defer _session_sync_to_c(session, &native)
     new_val, err := gj_data_increment(&native, string(key), int(delta), bool(user))

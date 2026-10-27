@@ -129,6 +129,21 @@ void test_buffer_argument_validation(void) {
     assert(gj_get_user_avatar_url_c(&session, NULL, 0) == 10);
     assert(gj_score_format_c(42, NULL, 0) == 10);
 
+    // Required C strings must be validated before conversion/dereference.
+    char input_buf[64];
+    assert(gj_scores_submit_c(&session, NULL, 1, 0, "") == 9);
+    assert(gj_scores_submit_c(&session, "1 point", 1, 0, NULL) == 6); // optional extra data may be NULL
+    assert(gj_scores_submit_guest_c(&session, NULL, "1 point", 1, 0) == 9);
+    assert(gj_scores_submit_guest_c(&session, "guest", NULL, 1, 0) == 9);
+    assert(gj_data_set_c(&session, NULL, "value", false) == 9);
+    assert(gj_data_set_c(&session, "key", NULL, false) == 9);
+    assert(gj_data_remove_c(&session, NULL, false) == 9);
+    assert(gj_data_get_c(&session, NULL, false, input_buf, sizeof(input_buf)) == 9);
+    assert(gj_data_get_int_c(&session, NULL, 0, false, NULL) == 9);
+    assert(gj_data_set_int_c(&session, NULL, 1, false) == 9);
+    assert(gj_data_increment_c(&session, NULL, 1, false, NULL) == 9);
+    assert(gj_data_set_user_picture_c(&session, NULL) == 9);
+
     gj_destroy_c(&session);
     PASS();
 }
