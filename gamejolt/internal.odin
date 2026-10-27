@@ -21,7 +21,7 @@ BASE_URL :: "https://api.gamejolt.com/api/game/v1_2"
 //  Signature Generation
 //
 //  Game Jolt API v1.2 spec:
-//  1. Build the full raw (unencoded) URL with all params
+//  1. Build the full URL with URL-encoded query parameters
 //  2. Append the private key
 //  3. MD5 hash the result
 // -----------------------------------------------------------------------
@@ -45,6 +45,9 @@ _gj_sign :: proc(url: string, private_key: string, allocator := context.allocato
 }
 
 // -----------------------------------------------------------------------
+//  URL Encoding
+// -----------------------------------------------------------------------
+
 @(private)
 _gj_url_encode :: proc(value: string, allocator := context.allocator) -> string {
     sb := strings.builder_make(allocator)
