@@ -27,6 +27,15 @@
  * gj_init_c returns a zeroed session when credentials are null or too long
  * for their 64-byte fields (maximum 63 characters plus NUL).
  * gj_login_c returns bad_credentials for null or oversized username/token.
+ * Other required null C string inputs return error 9 (unknown); the optional
+ * extra argument to gj_scores_submit_c accepts NULL as an empty string.
+ *
+ * String-output functions return error 10 when the output is missing, has no
+ * capacity, or cannot hold the complete string. On truncation, a positive-size
+ * buffer contains a null-terminated prefix. For array functions, insufficient
+ * capacity only limits how many entries are written; out_count still reports
+ * the total available count. Error 10 instead indicates a string field inside
+ * an entry did not fit its fixed-size struct field.
  *
  * Runtime dependency: libcurl.dll must be on PATH or next to gamejolt.dll.
  */
