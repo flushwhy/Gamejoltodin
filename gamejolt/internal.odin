@@ -60,6 +60,8 @@ _gj_url_encode :: proc(value: string, allocator := context.allocator) -> string 
     }
     return strings.to_string(sb)
 }
+
+// -----------------------------------------------------------------------
 //  URL Builder
 //
 //  Builds the signed URL from an endpoint and param map.
