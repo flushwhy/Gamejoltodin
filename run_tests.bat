@@ -26,7 +26,7 @@ if defined GAMEJOLT_CURL_LIB_DIR (
     )
 )
 
-odin test gamejolt %CURL_LINK_FLAGS%
+odin test gamejolt -linker:msvc %CURL_LINK_FLAGS%
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] Odin unit tests failed!
     exit /b %ERRORLEVEL%
