@@ -169,6 +169,22 @@ test_parse_response_invalid_json :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_parse_response_malformed_shapes :: proc(t: ^testing.T) {
+    bodies := [?]string{
+        `[]`,
+        `{}`,
+        `{"response":null}`,
+        `{"response":[]}`,
+        `{"response":{}}`,
+    }
+
+    for body in bodies {
+        _, err := _gj_parse_response(body, context.temp_allocator)
+        testing.expect_value(t, err, GJ_Error.Invalid_Response)
+    }
+}
+
+@(test)
 test_json_helpers :: proc(t: ^testing.T) {
     raw := `{"str":"hello","num":123,"num_str":"456","num_float":78.0,"flag":"true","not_flag":"false"}`
     val, _ := json.parse(transmute([]byte)raw, allocator = context.temp_allocator)
@@ -274,7 +290,8 @@ test_memory_cleanup_helpers :: proc(t: ^testing.T) {
     gj_user_delete(&user)
     testing.expect_value(t, user.username, "")
 
-    trophies := make([]GJ_Trophy, 1)
+    // Include a zero-initialized entry, as when parsing fails partway through a response.
+    trophies := make([]GJ_Trophy, 2)
     trophies[0] = GJ_Trophy{
         title       = strings.clone("Champion"),
         description = strings.clone("Won the game"),
@@ -282,7 +299,7 @@ test_memory_cleanup_helpers :: proc(t: ^testing.T) {
     }
     gj_trophies_delete(trophies)
 
-    scores := make([]GJ_Score, 1)
+    scores := make([]GJ_Score, 2)
     scores[0] = GJ_Score{
         score      = strings.clone("100 pts"),
         user       = strings.clone("hero"),
@@ -292,7 +309,7 @@ test_memory_cleanup_helpers :: proc(t: ^testing.T) {
     }
     gj_scores_delete(scores)
 
-    tables := make([]GJ_Score_Table, 1)
+    tables := make([]GJ_Score_Table, 2)
     tables[0] = GJ_Score_Table{
         name        = strings.clone("Main Table"),
         description = strings.clone("Desc"),
