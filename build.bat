@@ -38,7 +38,7 @@ odin build %PACKAGE% ^
     -build-mode:shared ^
     -no-entry-point ^
     -use-single-module ^
-    -linker:default ^
+    -linker:msvc ^
     -out:%OUT_DIR%\gamejolt.dll ^
     %CURL_LINK_FLAGS% ^
     -o:speed
