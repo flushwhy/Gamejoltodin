@@ -440,9 +440,7 @@ gj_data_get_c :: proc "c" (
     data, err := gj_data_get(&native, string(key), bool(user))
     if err != .None do return i32(err)
     defer delete(data)
-    if out_buf != nil && capacity > 0 {
-        if !_copy_to_buf(out_buf[:capacity], data) do return i32(GJ_Error.Buffer_Too_Small)
-    }
+    if !_copy_to_buf(out_buf[:capacity], data) do return i32(GJ_Error.Buffer_Too_Small)
     return 0
 }
 
@@ -500,9 +498,7 @@ gj_session_username_c :: proc "c" (
     defer _session_sync_to_c(session, &native)
     if !gj_is_logged_in(&native) do return i32(GJ_Error.Not_Authenticated)
     uname := gj_session_username(&native)
-    if out_buf != nil && capacity > 0 {
-        if !_copy_to_buf(out_buf[:capacity], uname) do return i32(GJ_Error.Buffer_Too_Small)
-    }
+    if !_copy_to_buf(out_buf[:capacity], uname) do return i32(GJ_Error.Buffer_Too_Small)
     return 0
 }
 
@@ -538,9 +534,7 @@ gj_get_user_avatar_url_c :: proc "c" (
     defer _session_sync_to_c(session, &native)
     url, err := gj_get_user_avatar_url(&native, context.temp_allocator)
     if err != .None do return i32(err)
-    if out_buf != nil && capacity > 0 {
-        if !_copy_to_buf(out_buf[:capacity], url) do return i32(GJ_Error.Buffer_Too_Small)
-    }
+    if !_copy_to_buf(out_buf[:capacity], url) do return i32(GJ_Error.Buffer_Too_Small)
     return 0
 }
 
@@ -557,9 +551,7 @@ gj_data_get_user_picture_c :: proc "c" (
     defer _session_sync_to_c(session, &native)
     pic, err := gj_data_get_user_picture(&native, context.temp_allocator)
     if err != .None do return i32(err)
-    if out_buf != nil && capacity > 0 {
-        if !_copy_to_buf(out_buf[:capacity], pic) do return i32(GJ_Error.Buffer_Too_Small)
-    }
+    if !_copy_to_buf(out_buf[:capacity], pic) do return i32(GJ_Error.Buffer_Too_Small)
     return 0
 }
 
@@ -650,9 +642,7 @@ gj_score_format_c :: proc "c" (
     context = runtime.default_context()
     if out_buf == nil || capacity <= 0 do return i32(GJ_Error.Buffer_Too_Small)
     formatted := gj_score_format(int(sort), context.temp_allocator)
-    if out_buf != nil && capacity > 0 {
-        if !_copy_to_buf(out_buf[:capacity], formatted) do return i32(GJ_Error.Buffer_Too_Small)
-    }
+    if !_copy_to_buf(out_buf[:capacity], formatted) do return i32(GJ_Error.Buffer_Too_Small)
     return 0
 }
 
