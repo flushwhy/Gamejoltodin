@@ -169,6 +169,22 @@ test_parse_response_invalid_json :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_parse_response_malformed_shapes :: proc(t: ^testing.T) {
+    bodies := [?]string{
+        `[]`,
+        `{}`,
+        `{"response":null}`,
+        `{"response":[]}`,
+        `{"response":{}}`,
+    }
+
+    for body in bodies {
+        _, err := _gj_parse_response(body, context.temp_allocator)
+        testing.expect_value(t, err, GJ_Error.Invalid_Response)
+    }
+}
+
+@(test)
 test_json_helpers :: proc(t: ^testing.T) {
     raw := `{"str":"hello","num":123,"num_str":"456","num_float":78.0,"flag":"true","not_flag":"false"}`
     val, _ := json.parse(transmute([]byte)raw, allocator = context.temp_allocator)
