@@ -116,6 +116,23 @@ void test_unauthenticated_guards(void) {
     PASS();
 }
 
+void test_buffer_argument_validation(void) {
+    TEST("C ABI rejects invalid output buffer capacities");
+
+    GJ_Session session = gj_init_c("game", "key");
+    assert(gj_trophies_fetch_c(&session, false, NULL, -1, NULL) == 9);
+    assert(gj_scores_fetch_c(&session, 0, 10, false, NULL, 1, NULL) == 9);
+    assert(gj_scores_tables_c(&session, NULL, -1, NULL) == 9);
+    assert(gj_data_keys_c(&session, false, NULL, 1, NULL) == 9);
+    assert(gj_data_get_c(&session, "key", false, NULL, 0) == 10);
+    assert(gj_session_username_c(&session, NULL, 0) == 10);
+    assert(gj_get_user_avatar_url_c(&session, NULL, 0) == 10);
+    assert(gj_score_format_c(42, NULL, 0) == 10);
+
+    gj_destroy_c(&session);
+    PASS();
+}
+
 void test_score_formatting(void) {
     TEST("gj_score_format_c utility");
 
@@ -161,6 +178,7 @@ int main(void) {
     test_session_lifecycle();
     test_oversized_credentials_rejected();
     test_unauthenticated_guards();
+    test_buffer_argument_validation();
     test_score_formatting();
 
     printf("\nResults: %d/%d tests passed successfully!\n", g_tests_passed, g_tests_run);

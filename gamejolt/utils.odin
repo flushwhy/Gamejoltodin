@@ -153,8 +153,8 @@ gj_data_set_int :: proc(
     return gj_data_set(session, key, s, user)
 }
 
-// Atomically increment an integer stored in the data store.
-// Reads the current value, adds delta, and writes it back.
+// Increments an integer stored in the data store with a read followed by a write.
+// This is not atomic; concurrent callers can overwrite each other's updates.
 // Returns the new value on success.
 gj_data_increment :: proc(
     session: ^GJ_Session,
@@ -162,7 +162,8 @@ gj_data_increment :: proc(
     delta:   int  = 1,
     user:    bool = false,
 ) -> (new_val: int, err: GJ_Error) {
-    current, _ := gj_data_get_int(session, key, 0, user)
+    current, get_err := gj_data_get_int(session, key, 0, user)
+    if get_err != .None do return 0, get_err
     next := current + delta
     set_err := gj_data_set_int(session, key, next, user)
     if set_err != .None do return 0, set_err
@@ -217,7 +218,10 @@ gj_trophies_unachieved :: proc(trophies: []GJ_Trophy) -> []GJ_Trophy {
     return result
 }
 
-// Fetch trophies async and call callback on the results in a background thread.
+// Fetch trophies async and call callback on the worker thread.
+// The session must remain valid until the callback runs. The callback owns
+// the returned slice and must release it with gj_trophies_delete; marshal
+// results to the main thread itself if its engine requires that.
 gj_trophies_fetch_async :: proc(
     session:       ^GJ_Session,
     achieved_only: bool,

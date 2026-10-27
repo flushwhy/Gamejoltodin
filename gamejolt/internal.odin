@@ -21,7 +21,7 @@ BASE_URL :: "https://api.gamejolt.com/api/game/v1_2"
 //  Signature Generation
 //
 //  Game Jolt API v1.2 spec:
-//  1. Build the full raw (unencoded) URL with all params
+//  1. Build the full URL with URL-encoded query parameters
 //  2. Append the private key
 //  3. MD5 hash the result
 // -----------------------------------------------------------------------
@@ -40,6 +40,26 @@ _gj_sign :: proc(url: string, private_key: string, allocator := context.allocato
     sb := strings.builder_make(allocator)
     for b in hash {
         fmt.sbprintf(&sb, "%02x", b)
+    }
+    return strings.to_string(sb)
+}
+
+// -----------------------------------------------------------------------
+//  URL Encoding
+// -----------------------------------------------------------------------
+
+@(private)
+_gj_url_encode :: proc(value: string, allocator := context.allocator) -> string {
+    sb := strings.builder_make(allocator)
+    for b in transmute([]u8)value {
+        if (b >= u8('A') && b <= u8('Z')) ||
+           (b >= u8('a') && b <= u8('z')) ||
+           (b >= u8('0') && b <= u8('9')) ||
+           b == u8('-') || b == u8('_') || b == u8('.') || b == u8('~') {
+            strings.write_rune(&sb, rune(b))
+        } else {
+            fmt.sbprintf(&sb, "%%%02X", b)
+        }
     }
     return strings.to_string(sb)
 }
@@ -74,23 +94,22 @@ _gj_build_url :: proc(
     }
     slice.sort(keys[:])
 
-    // Build raw (unencoded) param string for signing
-    raw_sb := strings.builder_make(context.temp_allocator)
+    // Encode parameters before signing; the signed URL must match the request URL.
+    query_sb := strings.builder_make(context.temp_allocator)
     for key, i in keys {
-        if i > 0 do strings.write_string(&raw_sb, "&")
-        strings.write_string(&raw_sb, key)
-        strings.write_string(&raw_sb, "=")
-        strings.write_string(&raw_sb, all_params[key])
+        if i > 0 do strings.write_string(&query_sb, "&")
+        strings.write_string(&query_sb, _gj_url_encode(key, context.temp_allocator))
+        strings.write_string(&query_sb, "=")
+        strings.write_string(&query_sb, _gj_url_encode(all_params[key], context.temp_allocator))
     }
-    raw_params := strings.to_string(raw_sb)
-    raw_url    := strings.concatenate({BASE_URL, endpoint, "?", raw_params}, context.temp_allocator)
+    query := strings.to_string(query_sb)
+    url := strings.concatenate({BASE_URL, endpoint, "?", query}, context.temp_allocator)
 
-    // Sign the raw URL
-    signature := _gj_sign(raw_url, session.private_key, context.temp_allocator)
+    signature := _gj_sign(url, session.private_key, context.temp_allocator)
 
     // Build final URL with signature appended
     final_sb := strings.builder_make(allocator)
-    strings.write_string(&final_sb, raw_url)
+    strings.write_string(&final_sb, url)
     strings.write_string(&final_sb, "&signature=")
     strings.write_string(&final_sb, signature)
 

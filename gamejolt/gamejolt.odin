@@ -82,7 +82,10 @@ gj_login :: proc(
     return user, .None
 }
 
-// Async convenience — Odin layer only, not exported to C ABI
+// Async convenience — Odin layer only, not exported to C ABI.
+// The session must remain valid until the callback runs. The callback runs
+// on a worker thread and owns the returned user's allocated strings; release
+// username, avatar_url, status, signed_up, and last_logged_in with delete().
 gj_login_async :: proc(
     session:  ^GJ_Session,
     username: string,
@@ -195,7 +198,10 @@ gj_trophies_fetch :: proc(
     result := make([]GJ_Trophy, len(trophies_arr), allocator)
     for entry, i in trophies_arr {
         obj, ok3 := entry.(json.Object)
-        if !ok3 do continue
+        if !ok3 {
+            gj_trophies_delete(result, allocator)
+            return nil, .Invalid_Response
+        }
         result[i] = _parse_trophy(obj, allocator)
     }
 
@@ -228,6 +234,7 @@ gj_scores_fetch :: proc(
     user_only: bool = false,
     allocator := context.allocator,
 ) -> (scores: []GJ_Score, err: GJ_Error) {
+    if user_only && !session.is_authed do return nil, .Not_Authenticated
     if session._scores_in_flight do return nil, .Request_In_Flight
     session._scores_in_flight = true
     defer session._scores_in_flight = false
@@ -252,7 +259,10 @@ gj_scores_fetch :: proc(
     result := make([]GJ_Score, len(scores_arr), allocator)
     for entry, i in scores_arr {
         obj, ok3 := entry.(json.Object)
-        if !ok3 do continue
+        if !ok3 {
+            gj_scores_delete(result, allocator)
+            return nil, .Invalid_Response
+        }
         result[i] = _parse_score(obj, allocator)
     }
 
@@ -275,7 +285,10 @@ gj_scores_tables :: proc(
     result := make([]GJ_Score_Table, len(tables_arr), allocator)
     for entry, i in tables_arr {
         obj, ok3 := entry.(json.Object)
-        if !ok3 do continue
+        if !ok3 {
+            gj_score_tables_delete(result, allocator)
+            return nil, .Invalid_Response
+        }
         result[i] = _parse_score_table(obj, allocator)
     }
 
@@ -434,7 +447,10 @@ gj_data_keys :: proc(
     result := make([]string, len(keys_arr), allocator)
     for entry, i in keys_arr {
         obj, ok3 := entry.(json.Object)
-        if !ok3 do continue
+        if !ok3 {
+            gj_data_keys_delete(result, allocator)
+            return nil, .Invalid_Response
+        }
         result[i] = strings.clone(_json_string(obj, "key"), allocator)
     }
 
