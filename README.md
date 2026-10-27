@@ -137,7 +137,7 @@ gcc -I. tests/test_c_api.c bin/gamejolt.lib -o bin/test_c_api.exe
   - `gj_session_username_c` / `gj_session_username`: Access cached session username.
   - `gj_has_trophy_c` / `gj_has_trophy`: Quickly test if a trophy is earned.
   - `gj_data_get_int_c` / `gj_data_set_int_c`: Read/write typed integers to data store.
-  - `gj_data_increment_c` / `gj_data_increment`: Increment numerical stats directly.
+  - `gj_data_increment_c` / `gj_data_increment`: Read-modify-write numerical stats; not atomic across concurrent callers.
   - `gj_score_format_c` / `gj_score_format`: Formats integer scores with thousand separators (e.g. `1,250,000`).
 
 ---
