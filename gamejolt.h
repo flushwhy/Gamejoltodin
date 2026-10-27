@@ -268,7 +268,7 @@ int32_t gj_data_set_int_c(
     bool        user
 );
 
-/* Atomically increment an integer in the data store. */
+/* Read, add, and write an integer in the data store (not atomic). */
 int32_t gj_data_increment_c(
     GJ_Session* session,
     const char* key,
