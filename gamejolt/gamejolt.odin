@@ -198,7 +198,10 @@ gj_trophies_fetch :: proc(
     result := make([]GJ_Trophy, len(trophies_arr), allocator)
     for entry, i in trophies_arr {
         obj, ok3 := entry.(json.Object)
-        if !ok3 do return nil, .Invalid_Response
+        if !ok3 {
+            gj_trophies_delete(result, allocator)
+            return nil, .Invalid_Response
+        }
         result[i] = _parse_trophy(obj, allocator)
     }
 
@@ -256,7 +259,10 @@ gj_scores_fetch :: proc(
     result := make([]GJ_Score, len(scores_arr), allocator)
     for entry, i in scores_arr {
         obj, ok3 := entry.(json.Object)
-        if !ok3 do return nil, .Invalid_Response
+        if !ok3 {
+            gj_scores_delete(result, allocator)
+            return nil, .Invalid_Response
+        }
         result[i] = _parse_score(obj, allocator)
     }
 
@@ -279,7 +285,10 @@ gj_scores_tables :: proc(
     result := make([]GJ_Score_Table, len(tables_arr), allocator)
     for entry, i in tables_arr {
         obj, ok3 := entry.(json.Object)
-        if !ok3 do return nil, .Invalid_Response
+        if !ok3 {
+            gj_score_tables_delete(result, allocator)
+            return nil, .Invalid_Response
+        }
         result[i] = _parse_score_table(obj, allocator)
     }
 
@@ -438,7 +447,10 @@ gj_data_keys :: proc(
     result := make([]string, len(keys_arr), allocator)
     for entry, i in keys_arr {
         obj, ok3 := entry.(json.Object)
-        if !ok3 do return nil, .Invalid_Response
+        if !ok3 {
+            gj_data_keys_delete(result, allocator)
+            return nil, .Invalid_Response
+        }
         result[i] = strings.clone(_json_string(obj, "key"), allocator)
     }
 
