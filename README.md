@@ -44,6 +44,26 @@ A static ABI helps keep the interface predictable, but it does not by itself pre
 
 The native Odin API returns an Odin-owned `GJ_Session`. Initialize it with `gj_init` and call `gj_destroy(&session)` when finished so its cloned credential and authentication strings are released. The C API instead uses the fixed-layout `GJ_Session` declared in `gamejolt.h`; its buffers are part of the ABI and must not be confused with the native Odin type.
 
+## API Contract: Errors, Buffers, and Ownership
+
+### Error codes
+
+The C API returns `0` on success and the numeric `GJ_Error` values documented at the top of `gamejolt.h`. These values are part of the public contract; do not renumber them. Required null C string inputs return `9` (`Unknown`), while the optional `extra` argument to `gj_scores_submit_c` accepts `NULL` as an empty string. A null session returns `7` (`Missing_Config`) for status-returning functions.
+
+### C output buffers
+
+- The caller owns every buffer passed to a C function. The library does not retain those pointers after the call returns.
+- String-output functions require a non-null buffer and a positive capacity. If the complete string does not fit, the function returns `10` (`Buffer_Too_Small`) and the buffer contains a truncated, null-terminated prefix.
+- For array-returning functions, pass `out_buf = NULL` and `capacity = 0` to query the total count. With a buffer, at most `capacity` entries are written and `out_count` still reports the total available count. A capacity smaller than the number of entries is not itself an error. A `10` return means a string field inside an entry did not fit its fixed-size field; treat that entry as unusable.
+- Negative capacities, or a null array buffer with nonzero capacity, return `9` (`Unknown`). Check return codes before using output values.
+
+### Odin ownership and threading
+
+- Native Odin calls that return strings, users, or slices use the supplied allocator when available; otherwise they default to `context.allocator`. Free returned values with the matching cleanup helper (for example `gj_user_delete`, `gj_trophies_delete`, `gj_scores_delete`, `gj_score_tables_delete`, or `gj_data_keys_delete`) and pass the same allocator used for the result when it was not the default.
+- `gj_init` clones the credentials. Always call `gj_destroy` when finished with a native session.
+- `gj_login_async` runs its callback on a worker thread. Keep the referenced session alive until the callback has completed, and do not destroy it while a request is in flight. Treat the session as single-owner state: do not make overlapping calls from multiple threads unless the application provides its own synchronization.
+- The async callback receives a `GJ_User` whose allocated string fields it must release (`username`, `avatar_url`, `status`, `signed_up`, and `last_logged_in`). Callback code runs on a worker thread, so marshal engine/UI work to the appropriate thread.
+
 ## C ABI Guidelines
 
 These rules apply to the C adapter and public C header—not to the native Odin API:
