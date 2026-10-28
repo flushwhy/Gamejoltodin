@@ -250,3 +250,12 @@ main :: proc() {
 ```
 
 
+
+
+## Working Odin example
+
+[DapperO](https://github.com/flushwhy/DapperO) is the companion Odin + Raylib project. Its [Gamejoltodin integration example](https://github.com/flushwhy/DapperO/tree/main/examples/gamejoltodin) demonstrates player authentication, opening a Game Jolt session, and submitting a leaderboard score.
+
+The example pins a known Gamejoltodin commit, reads development credentials from environment variables, and includes setup instructions in its own README. See the [DapperO README](https://github.com/flushwhy/DapperO#game-jolt-api-example) to run it locally.
+
+The private key is still extractable from a distributed client; environment variables keep credentials out of source control but are not a security boundary for shipped binaries.
