@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Gamejoltodin documentation for the Odin-first Game Jolt API client and C ABI.">
+<title>Gamejoltodin Documentation</title>
+<style>
+:root{color-scheme:light dark;--blue:#315b9b;--bg:light-dark(#f5f7fb,#11151c);--panel:light-dark(#fff,#1a202a);--text:light-dark(#202735,#e8edf5);--muted:light-dark(#627086,#a9b5c7);--line:light-dark(#e1e7f0,#303a49);--soft:light-dark(#e8eef8,#24334a)}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.7 Inter,system-ui,-apple-system,"Segoe UI",sans-serif}a{color:inherit}.top{background:var(--blue);color:white;padding:18px max(22px,calc((100vw - 1120px)/2));display:flex;gap:14px;align-items:center}.mark{display:grid;place-items:center;width:40px;height:40px;border-radius:12px;background:#ffffff24;font-weight:800}.brand{font-weight:750}.brand small{display:block;font-weight:400;opacity:.8;font-size:12px}.wrap{max-width:1120px;margin:auto;padding:34px 22px 60px}.hero{background:var(--blue);color:white;border-radius:22px;padding:clamp(28px,6vw,60px);position:relative;overflow:hidden}.eyebrow{text-transform:uppercase;letter-spacing:1.5px;font-size:11px;font-weight:800;opacity:.8}.hero h1{font-size:clamp(36px,6vw,58px);line-height:1.05;letter-spacing:-.04em;max-width:720px;margin:16px 0}.hero p{max-width:690px;color:#ffffffdc}.actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:24px}.btn{display:inline-block;text-decoration:none;padding:10px 15px;border-radius:10px;font-weight:700;font-size:14px}.primary{background:white;color:#244674}.outline{border:1px solid #ffffff70}.heading{margin:38px 0 15px}.heading h2{margin:0;font-size:25px;letter-spacing:-.03em}.heading p,.card p{color:var(--muted);margin:5px 0 0}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.card{padding:22px;border:1px solid var(--line);border-radius:16px;background:var(--panel)}.card h3{margin:0 0 8px;font-size:18px}.card p{font-size:14px}.tag{display:inline-block;background:var(--soft);color:light-dark(#203653,#d8e4f8);border-radius:8px;padding:3px 8px;font-size:12px;font-weight:750;margin-bottom:12px}pre{overflow:auto;background:light-dark(#172235,#0c1119);color:#e7edf7;padding:18px;border-radius:12px;font-size:13px}code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}.footer{margin-top:45px;padding-top:20px;border-top:1px solid var(--line);font-size:13px;color:var(--muted)}@media(max-width:650px){.grid{grid-template-columns:1fr}.top{padding:14px 20px}}
+</style>
+</head>
+<body>
+<header class="top"><div class="mark">Gj</div><div class="brand">Gamejoltodin<small>Developer documentation</small></div></header>
+<main class="wrap">
+<section class="hero"><div class="eyebrow">Game Jolt API v1.2 · Odin + C</div><h1>Game Jolt integration, without the busywork.</h1><p>An Odin-first client for authentication, sessions, trophies, leaderboards, and cloud data—with a compact C interface for engines and native applications.</p><div class="actions"><a class="btn primary" href="#quickstart">Get started →</a><a class="btn outline" href="https://github.com/flushwhy/Gamejoltodin">View source on GitHub ↗</a></div></section>
+<section><div class="heading"><h2>Find your way around</h2><p>Start with a quick build, then use the API references when you need them.</p></div><div class="grid">
+<article class="card"><span class="tag">START HERE</span><h3>Quick start</h3><p>Build the library, initialize a session, and make your first authenticated request.</p></article>
+<article class="card"><span class="tag">ODIN</span><h3>Native Odin API</h3><p>Use Odin strings, slices, allocators, typed results, and explicit cleanup.</p></article>
+<article class="card"><span class="tag">C ABI</span><h3>C API reference</h3><p>Integrate from C or an engine using fixed-layout structs and caller-owned buffers.</p></article>
+<article class="card"><span class="tag">LIFECYCLE</span><h3>Sessions & ownership</h3><p>Understand authentication, session heartbeats, callbacks, and memory lifetimes.</p></article>
+</div></section>
+<section id="quickstart"><div class="heading"><h2>Quick start</h2><p>From the repository root.</p></div><article class="card"><h3>1. Install prerequisites</h3><p>Install the <a href="https://odin-lang.org/">Odin compiler</a> and libcurl development files.</p><h3>2. Build the library</h3><pre><code># Windows
+build.bat
+
+# Linux / macOS
+chmod +x build.sh
+./build.sh</code></pre><h3>3. Initialize a session in Odin</h3><pre><code>import "core:fmt"
+import "gamejolt"
+
+main :: proc() {
+    session := gamejolt.gj_init("YOUR_GAME_ID", "YOUR_PRIVATE_KEY")
+    defer gamejolt.gj_destroy(&session)
+
+    user, err := gamejolt.gj_login(&session, "username", "token")
+    if err == .None {
+        defer gamejolt.gj_user_delete(&user)
+        fmt.printf("Logged in: %s (ID: %d)\n", user.username, user.id)
+    } else {
+        fmt.printfln("Login failed: %v", err)
+    }
+}</code></pre><p>Replace placeholders with your own credentials. Keep the private key out of public client-side distributions where possible.</p></article></section>
+<section><div class="heading"><h2>API areas</h2><p>One implementation, two interfaces.</p></div><div class="grid">
+<article class="card"><h3>Player & sessions</h3><p>Authenticate a player, check login state, and open, ping, or close a play session.</p></article>
+<article class="card"><h3>Game progression</h3><p>Fetch and unlock trophies, submit player or guest scores, and read leaderboard tables.</p></article>
+<article class="card"><h3>Cloud data</h3><p>Read, write, remove, and list keys in user-scoped or global data stores.</p></article>
+<article class="card"><h3>Errors & buffers</h3><p>C calls return status codes and use caller-owned buffers. Check <code>gamejolt.h</code> for exact signatures and capacity rules.</p></article>
+</div></section>
+<div class="footer">Gamejoltodin · Open source documentation · <a href="https://github.com/flushwhy/Gamejoltodin">GitHub repository</a></div>
+</main>
+</body>
+</html>
