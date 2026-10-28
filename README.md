@@ -252,6 +252,10 @@ main :: proc() {
 
 
 
+## Release readiness
+
+See the [1.0 release checklist](docs/RELEASE_CHECKLIST.md) before publishing a release.
+
 ## Working Odin example
 
 [DapperO](https://github.com/flushwhy/DapperO) is the companion Odin + Raylib project. Its [Gamejoltodin integration example](https://github.com/flushwhy/DapperO/tree/main/examples/gamejoltodin) demonstrates player authentication, opening a Game Jolt session, and submitting a leaderboard score.
