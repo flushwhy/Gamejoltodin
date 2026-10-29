@@ -24,15 +24,22 @@ if not defined CURL_LIB_DIR (
                 git clone https://github.com/microsoft/vcpkg.git "!VCPKG_ROOT!"
                 if errorlevel 1 (
                     echo [ERROR] Could not download vcpkg. Install Git or set VCPKG_INSTALLATION_ROOT.
-                    endlocal & exit /b 1
+                    endlocal
+                    exit /b 1
                 )
             )
             call "!VCPKG_ROOT!\bootstrap-vcpkg.bat" -disableMetrics
-            if errorlevel 1 endlocal & exit /b 1
+            if errorlevel 1 (
+                endlocal
+                exit /b 1
+            )
         )
     )
     call "!VCPKG_ROOT!\vcpkg.exe" install curl:x64-windows
-    if errorlevel 1 endlocal & exit /b 1
+    if errorlevel 1 (
+        endlocal
+        exit /b 1
+    )
     set "CURL_LIB_DIR=!VCPKG_ROOT!\installed\x64-windows\lib"
 )
 
