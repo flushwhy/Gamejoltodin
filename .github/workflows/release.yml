@@ -56,15 +56,20 @@ jobs:
         if: matrix.platform == 'windows'
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Install curl (Windows)
+      - name: Find or install curl (Windows)
         if: matrix.platform == 'windows'
         shell: pwsh
         run: |
-          vcpkg install curl:x64-windows
           $curlRoot = Join-Path $env:VCPKG_INSTALLATION_ROOT "installed\x64-windows"
-          if (-not (Test-Path "$curlRoot\lib\libcurl.lib")) {
-            throw "vcpkg did not install libcurl.lib under $curlRoot"
+          $curlLib = Join-Path $curlRoot "lib\libcurl.lib"
+          if (-not (Test-Path $curlLib)) {
+            Write-Host "libcurl.lib not found at $curlLib; installing curl:x64-windows."
+            vcpkg install curl:x64-windows
           }
+          if (-not (Test-Path $curlLib)) {
+            throw "libcurl.lib is still missing after vcpkg install: $curlLib"
+          }
+          Write-Host "Using libcurl import library: $curlLib"
           "GAMEJOLT_CURL_LIB_DIR=$curlRoot\lib" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "$curlRoot\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
