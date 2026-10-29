@@ -49,7 +49,7 @@ gj_login :: proc(
     }
     defer delete(params)
 
-    response, req_err := _gj_request(session, "/users/auth", params, context.temp_allocator)
+    _, req_err := _gj_request(session, "/users/auth", params, context.temp_allocator)
     if req_err != .None do return {}, req_err
 
     // Fetch full user data
