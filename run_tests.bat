@@ -5,26 +5,9 @@ echo ============================================================
 echo   1. Running Odin Unit Tests
 echo ============================================================
 
-set "CURL_LINK_FLAGS=-extra-linker-flags:libcurl.lib"
-if defined GAMEJOLT_CURL_LIB_DIR (
-    if exist "%GAMEJOLT_CURL_LIB_DIR%\libcurl.lib" (
-        set "CURL_LINK_FLAGS=-extra-linker-flags:"/LIBPATH:%GAMEJOLT_CURL_LIB_DIR% libcurl.lib""
-    )
-) else if exist "odin\vendor\curl\lib\libcurl.lib" (
-    set "CURL_LINK_FLAGS=-extra-linker-flags:"/LIBPATH:odin\vendor\curl\lib libcurl.lib""
-) else if exist "C:\ProgramData\chocolatey\lib\curl\tools\curl-*\lib\libcurl.lib" (
-    for /d %%D in ("C:\ProgramData\chocolatey\lib\curl\tools\curl-*") do (
-        set "CURL_LINK_FLAGS=-extra-linker-flags:"/LIBPATH:%%D\lib libcurl.lib""
-    )
-) else if exist "deps\curl\lib\libcurl.lib" (
-    set "CURL_LINK_FLAGS=-extra-linker-flags:"/LIBPATH:deps\curl\lib libcurl.lib""
-) else if exist "vendor\curl\lib\libcurl.lib" (
-    set "CURL_LINK_FLAGS=-extra-linker-flags:"/LIBPATH:vendor\curl\lib libcurl.lib""
-) else if defined VCPKG_INSTALLATION_ROOT (
-    if exist "%VCPKG_INSTALLATION_ROOT%\x64-windows\lib\libcurl.lib" (
-        set "CURL_LINK_FLAGS=-extra-linker-flags:"/LIBPATH:%VCPKG_INSTALLATION_ROOT%\x64-windows\lib libcurl.lib""
-    )
-)
+call "%~dp0ensure_curl.bat"
+if errorlevel 1 exit /b 1
+set "CURL_LINK_FLAGS=-extra-linker-flags:"/LIBPATH:%GAMEJOLT_CURL_LIB_DIR% libcurl.lib""
 
 odin test gamejolt -linker:msvc %CURL_LINK_FLAGS%
 if %ERRORLEVEL% neq 0 (
