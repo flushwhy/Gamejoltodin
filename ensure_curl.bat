@@ -12,6 +12,7 @@ if not defined CURL_LIB_DIR if exist "%CURL_ROOT%vendor\curl\lib\libcurl.lib" se
 if not defined CURL_LIB_DIR if exist "C:\odin\vendor\curl\lib\libcurl.lib" set "CURL_LIB_DIR=C:\odin\vendor\curl\lib"
 if not defined CURL_LIB_DIR if defined VCPKG_INSTALLATION_ROOT if exist "%VCPKG_INSTALLATION_ROOT%\installed\x64-windows\lib\libcurl.lib" set "CURL_LIB_DIR=%VCPKG_INSTALLATION_ROOT%\installed\x64-windows\lib"
 if not defined CURL_LIB_DIR if exist "%LOCALAPPDATA%\vcpkg\installed\x64-windows\lib\libcurl.lib" set "CURL_LIB_DIR=%LOCALAPPDATA%\vcpkg\installed\x64-windows\lib"
+if not defined CURL_LIB_DIR for /d %%D in ("C:\ProgramData\chocolatey\lib\curl\tools\curl-*") do if exist "%%D\lib\libcurl.lib" if not defined CURL_LIB_DIR set "CURL_LIB_DIR=%%D\lib"
 
 if not defined CURL_LIB_DIR (
     echo [curl] libcurl.lib not found; installing curl:x64-windows with vcpkg...
